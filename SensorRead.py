@@ -3,6 +3,7 @@ import glob
 import os
 import board
 import adafruit_am2320
+import statistics
 
 os.system('modprobe w1-gpio')
 os.system('modprobe w1-therm')
@@ -17,9 +18,11 @@ class SensorRead:
 
         self.humidity = 0
         self.temps = [0 for i in range(tempsCount)]
-        self.mean = 0
-        self.min = 0
-        self.max = 0
+        self.sortedTemps = sorted(self.temps)
+        self.meanTemp = 0
+        self.medianTemp = 0
+        self.minTemp = 0
+        self.maxTemp = 0
         
         print("Found folders: ")
         print(self.deviceFolders)
@@ -38,9 +41,11 @@ class SensorRead:
         
         self.temps[len(self.deviceFolders)] = self.htSensor.temperature
         
-        self.mean = sum(self.temps) / len(self.temps)
-        self.min = min(self.temps)
-        self.max = max(self.temps)
+        self.meanTemp = sum(self.temps) / len(self.temps)
+        self.sortedTemps = sorted(self.temps)
+        self.medianTemp = statistics.median(self.sortedTemps)
+        self.minTemp = min(self.temps)
+        self.maxTemp = max(self.temps)
 
     def read_temp_raw(self, deviceFile):
         f = open(deviceFile, 'r')

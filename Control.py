@@ -10,27 +10,59 @@ class Control:
     def __init__(self):
         self.min = 100
         self.max = 0
-        self.targetTemp = 24
-        self.delay = 10
         self.heater = LED(17)
+        self.fan1 = LED(27)
+        self.fan2 = LED(22)
         self.heater.off()
+        self.fan1.off()
+        self.fan2.off()
+
+        self.targetTemp = 25.5
+        self.delay = 300
+        self.heaterCycleCount = 0
+        self.heaterOnCycles = 10 # denominator for heater on fraction
+        self.heaterDelay = 30 # denominator for heater on fraction
         self.userInputs()
+
 
         self.sensors = SensorRead.SensorRead();
 
     def allOff(self):
         self.heater.off();
+        self.fan1.off()
+        self.fan2.off()
 
     def read(self):
             self.sensors.readAll()
-            self.min = min(self.sensors.min, self.min)
-            self.max = max(self.sensors.max, self.max)
-            
+            self.min = min(self.sensors.medianTemp, self.min)
+            self.max = max(self.sensors.medianTemp, self.max)
+      
     def action(self):
-        if self.sensors.max < self.targetTemp:
-             self.heater.on()
+        if self.heatingRequired():
+            if self.heaterCycleCount % self.heaterOnCycles == 0:
+                self.heater.on()
+            else:
+                self.heater.off()
+            self.heaterCycleCount += 1
         else: 
             self.heater.off()
+            self.heaterCycleCount = 0
+
+        if self.coolingRequired():
+            self.fan1.on()
+            self.fan2.on()
+        else: 
+            self.fan1.off()
+            self.fan2.off()
+
+    def heatingRequired(self) :
+        l = len(self.sensors.sortedTemps)
+        return (self.sensors.sortedTemps[l -1] < self.targetTemp + 13 
+                and self.sensors.sortedTemps[l -2] < self.targetTemp + 3
+                and self.sensors.medianTemp < self.targetTemp)
+    
+    def coolingRequired(self) :
+        return self.sensors.medianTemp >= self.targetTemp + 1
 
     def status(self, appliance):
         if appliance.is_lit:
@@ -39,30 +71,53 @@ class Control:
             return "off"
 
     def displayTemps(self):
-        print(datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-                + " || " + self.status(self.heater)
-                + " | " + '{:.1f}'.format(self.sensors.min)
-                + " | " + '{:.1f}'.format(self.sensors.mean)
-                + " | " + '{:.1f}'.format(self.sensors.max)
+        if (self.heatingRequired()):
+            tempStatus = "low"
+        elif (self.coolingRequired()):
+            tempStatus = "high"
+        else:
+            tempStatus = "ok"
+
+        print(self.tempsColour(), end = '')
+        print(
+            datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
+                + str(tempStatus) + " ||"  
+                + " " + self.status(self.heater)
+                + " " + self.status(self.fan1)
+                + " " + self.status(self.fan2)
+                + " l:" + '{:.1f}'.format(self.sensors.minTemp)
+                + " med:" + '{:.1f}'.format(self.sensors.medianTemp)
+                + " h:" + '{:.1f}'.format(self.sensors.maxTemp)
                 + " || min/max: " + '{:.1f}'.format(self.min)+ "/" + '{:.1f}'.format(self.max)
                 + " || count: " + str(len(self.sensors.deviceFolders))
                 + " || "
-                , end = ""
+                , end = "\033[37m"
             )
-        
+
         temps = [0 for i in range(len(self.sensors.temps))]
         for i, temp in enumerate(self.sensors.temps):
             temps[i] = '{:.1f}'.format(temp)
+        print(temps, end = "")
 
-        print(temps)
+        print(" || RH: " + '{:.1f}'.format(self.sensors.humidity))
+
+    def tempsColour(self):
+        if self.coolingRequired():
+            return '\031[93m'
+        if self.heater.is_lit:
+            return '\033[96m'
+        if self.heatingRequired():
+            return '\033[94m'
+        return '\033[32m'
+
 
     def speakTemps(self):
         espeak.synth("Current temps: max..")
-        espeak.synth('{:.1f}'.format(self.sensors.max))
+        espeak.synth('{:.1f}'.format(self.sensors.maxTemp))
         espeak.synth("Current temps: mean. ")
-        espeak.synth('{:.1f}'.format(self.sensors.mean))
+        espeak.synth('{:.1f}'.format(self.sensors.meanTemp))
         espeak.synth("Current temps: min. ")
-        espeak.synth('{:.1f}'.format(self.sensors.mean))
+        espeak.synth('{:.1f}'.format(self.sensors.meanTemp))
         self.speakProbes()
         espeak.synth("Overall max.")
         espeak.synth('{:.1f}'.format(self.max))
@@ -95,15 +150,25 @@ class Control:
         delay = self.input("Enter delay, seconds. Default is " + str(self.delay) + ": ")
         if not delay: delay = self.delay
 
-        self.targetTemp = int(targetTemp)
+        heaterDelay = self.input("Enter heater on time, default is " + str(self.heaterDelay) + ": ")
+        if not heaterDelay: heaterDelay = self.heaterDelay
+
+        heaterOnModulus = self.input("Heater on cycles, default is " + str(self.heaterOnCycles) + ": ")
+        if not heaterOnModulus: heaterOnModulus = self.heaterOnCycles
+
+        self.targetTemp = float(targetTemp)
         self.delay = int(delay)
+        self.heaterDelay = int(heaterDelay)
+        self.heaterOnCycles = int(heaterOnModulus)
 
         self.output(
             "Target temperature is "
                 + str(self.targetTemp)
                 + " and delay is "
                 + str(self.delay)
-                + " seconds"
+                + " seconds. "
+                + " Heater on for " + str(self.heaterDelay)
+                + " seconds in " + str(self.heaterOnCycles) + " cycles."
             )
     
     def input(self, string):
@@ -128,6 +193,12 @@ class Control:
         else:
             return self.output("Command not recognised")
 
+    def delayExceeded(self):
+        if self.heatingRequired():
+            return int(time.time()) - self.lastReadTs >= self.heaterDelay
+        else:    
+            return int(time.time()) - self.lastReadTs >= self.delay
+
     def run(self):
         try:
             while True:
@@ -135,7 +206,7 @@ class Control:
                 self.read()
                 self.action()
                 self.displayTemps()
-                while(int(time.time()) - self.lastReadTs < self.delay):
+                while(not self.delayExceeded()):
                     time.sleep(0.1)
         except KeyboardInterrupt:
             self.allOff()

@@ -4,8 +4,10 @@
 # 1W    4   14  
 # GND   x   15
 # HEAT  17  18
-#       27  x
-#       22  23
+#240 2  27  x
+#fan    22  23
+# fan  3.3  24
+#       10  G
 
 
 import Control
