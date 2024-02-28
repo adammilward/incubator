@@ -17,7 +17,8 @@ class Control:
         self.fan1.off()
         self.fan2.off()
 
-        self.targetTemp = 25.5
+        self.targetTemp = 25
+        self.maxTargetTemp = 26
         self.delay = 300
         self.heaterCycleCount = 0
         self.heaterOnCycles = 10 # denominator for heater on fraction
@@ -39,21 +40,33 @@ class Control:
       
     def action(self):
         if self.heatingRequired():
-            if self.heaterCycleCount % self.heaterOnCycles == 0:
-                self.heater.on()
-            else:
-                self.heater.off()
-            self.heaterCycleCount += 1
+            self.fanOff()
+            self.heaterOn()
         else: 
+            self.heaterOff()
+            if self.coolingRequired():
+                self.fanOn()
+            else: 
+                self.fanOff()
+                
+    def heaterOn(self):
+        if self.heaterCycleCount % self.heaterOnCycles == 0:
+            self.heater.on()
+        else:
             self.heater.off()
-            self.heaterCycleCount = 0
-
-        if self.coolingRequired():
-            self.fan1.on()
-            self.fan2.on()
-        else: 
-            self.fan1.off()
-            self.fan2.off()
+        self.heaterCycleCount += 1
+    
+    def heaterOff(self):
+        self.heater.off()
+        self.heaterCycleCount = 0
+    
+    def fanOff(self):
+        self.fan1.off()
+        self.fan2.off()
+        
+    def fanOn(self):
+        self.fan1.on()
+        self.fan2.on()    
 
     def heatingRequired(self) :
         l = len(self.sensors.sortedTemps)
@@ -62,7 +75,7 @@ class Control:
                 and self.sensors.medianTemp < self.targetTemp)
     
     def coolingRequired(self) :
-        return self.sensors.medianTemp >= self.targetTemp + 1
+        return self.sensors.medianTemp > self.maxTargetTemp
 
     def status(self, appliance):
         if appliance.is_lit:
@@ -103,7 +116,7 @@ class Control:
 
     def tempsColour(self):
         if self.coolingRequired():
-            return '\031[93m'
+            return '\033[93m'
         if self.heater.is_lit:
             return '\033[96m'
         if self.heatingRequired():
@@ -147,6 +160,9 @@ class Control:
         targetTemp = self.input("Enter target temperature. Default is " + str(self.targetTemp) + ": ")
         if not targetTemp: targetTemp = self.targetTemp
         
+        maxTargetTemp = self.input("Enter max target temperature. Default is " + str(self.maxTargetTemp) + ": ")
+        if not maxTargetTemp: maxTargetTemp = self.maxTargetTemp
+        
         delay = self.input("Enter delay, seconds. Default is " + str(self.delay) + ": ")
         if not delay: delay = self.delay
 
@@ -160,10 +176,13 @@ class Control:
         self.delay = int(delay)
         self.heaterDelay = int(heaterDelay)
         self.heaterOnCycles = int(heaterOnModulus)
+        self.maxTargetTemp = max(self.targetTemp + 0.5, int(maxTargetTemp))
 
         self.output(
             "Target temperature is "
                 + str(self.targetTemp)
+                + " Max target temp is "
+                + str(self.maxTargetTemp)
                 + " and delay is "
                 + str(self.delay)
                 + " seconds. "
