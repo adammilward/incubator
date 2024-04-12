@@ -1,239 +1,166 @@
-from datetime import datetime
+
 import time
 import SensorRead
+import UserIO
 from gpiozero import LED
-from espeak import espeak
-
-
+import statistics
 
 class Control:
     def __init__(self):
-        self.min = 100
-        self.max = 0
         self.heater = LED(17)
-        self.fan1 = LED(27)
-        self.fan2 = LED(22)
+        self.dcPow = LED(27)
+        self.fan = LED(22)
+        self.light = LED(10)
         self.heater.off()
-        self.fan1.off()
-        self.fan2.off()
+        self.dcPow.off()
+        self.fan.off()
+        self.light.off()
+        
+        self.heatingStartedTs = 0
+        self.lastDisplayTs = 0
+        self.readDelay = 10
 
-        self.targetTemp = 25
-        self.maxTargetTemp = 26
-        self.delay = 300
-        self.heaterCycleCount = 0
-        self.heaterOnCycles = 10 # denominator for heater on fraction
-        self.heaterDelay = 30 # denominator for heater on fraction
-        self.userInputs()
+        self.sensors = SensorRead.SensorRead()
+        self.lastMonitoredTemp = self.sensors.meanTemp
+        self.rising = False
+        self.wasRising = False
+        self.heatingWasActive = False
 
-
-        self.sensors = SensorRead.SensorRead();
+        self.io = UserIO.UserIO(self.sensors)
+        #self.io.userInputs()
 
     def allOff(self):
         self.heater.off();
-        self.fan1.off()
-        self.fan2.off()
-
-    def read(self):
-            self.sensors.readAll()
-            self.min = min(self.sensors.medianTemp, self.min)
-            self.max = max(self.sensors.medianTemp, self.max)
+        self.dcPow.off()
+        self.fan.off()
       
     def action(self):
-        if self.heatingRequired():
-            self.fanOff()
-            self.heaterOn()
-        else: 
-            self.heaterOff()
-            if self.coolingRequired():
-                self.fanOn()
-            else: 
-                self.fanOff()
-                
-    def heaterOn(self):
-        if self.heaterCycleCount % self.heaterOnCycles == 0:
-            self.heater.on()
+        if self.isHeatingRequired():
+            self.activateHeater()
         else:
-            self.heater.off()
-        self.heaterCycleCount += 1
-    
+            self.heaterOff()
+            #if (self.heatingWasActive != self.isHeatingRequired()):
+            #    self.displayTemps('a ')
+
+        if self.isCirculationRequired():
+            self.fanOn()
+        else:
+            self.fanOff()
+            
+        self.displayAction()    
+
+        self.heatingWasActive = self.isHeatingRequired()
+
+    def displayAction(self):
+        if (int(time.time()) - self.lastDisplayTs >= self.io.displayTempsTime):
+            self.lastDisplayTs = int(time.time())
+            self.displayTemps('..')
+
+    def isHeatingRequired(self):
+        return (self.sensors.maxTemp < self.io.maxTemp
+                and self.sensors.fruitMedian < self.io.targetFruitTemp
+                and self.sensors.spawnMedian < self.io.targetSpawnTemp)
+
+    def isCirculationRequired(self):
+        return (self.sensors.fruitMedian < self.io.targetFruitTemp
+                and self.sensors.fruitMax < self.io.targetFruitTemp + 1)
+
+    def activateHeater(self):
+        if (int(time.time()) - self.heatingStartedTs >= self.io.heaterCycleTime):
+            self.heatingStartedTs = int(time.time())
+
+        if (int(time.time()) - self.heatingStartedTs < self.io.heaterOnTime):
+            self.heaterOn()
+        else:
+            self.heaterOff()
+        
     def heaterOff(self):
-        self.heater.off()
-        self.heaterCycleCount = 0
+        if (self.heater.is_lit):
+            self.heater.off()
+            self.dcPowSupply()
+            self.displayTemps('b ')
     
+    def heaterOn(self):
+        if (not self.heater.is_lit):
+            self.heater.on()
+            self.dcPowSupply()
+            self.displayTemps('c ')
+
     def fanOff(self):
-        self.fan1.off()
-        self.fan2.off()
+        if(self.dcPow.is_lit):
+            self.fan.off()
+            self.dcPowSupply()
+            self.displayTemps('d ')
         
     def fanOn(self):
-        self.fan1.on()
-        self.fan2.on()    
+        if(not self.dcPow.is_lit):
+            self.fan.on()
+            self.dcPowSupply()
+            self.displayTemps('e ')
 
-    def heatingRequired(self) :
-        l = len(self.sensors.sortedTemps)
-        return (self.sensors.sortedTemps[l -1] < self.targetTemp + 13 
-                and self.sensors.sortedTemps[l -2] < self.targetTemp + 3
-                and self.sensors.medianTemp < self.targetTemp)
-    
-    def coolingRequired(self) :
-        return self.sensors.medianTemp > self.maxTargetTemp
-
-    def status(self, appliance):
-        if appliance.is_lit:
-            return "on"
+    def dcPowSupply(self):
+        if (self.fan.is_lit or self.light.is_lit):
+            self.dcPow.on()
         else:
-            return "off"
+            self.dcPow.off()
 
-    def displayTemps(self):
-        if (self.heatingRequired()):
-            tempStatus = "low"
-        elif (self.coolingRequired()):
-            tempStatus = "high"
-        else:
-            tempStatus = "ok"
 
-        print(self.tempsColour(), end = '')
-        print(
-            datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
-                + str(tempStatus) + " ||"  
-                + " " + self.status(self.heater)
-                + " " + self.status(self.fan1)
-                + " " + self.status(self.fan2)
-                + " l:" + '{:.1f}'.format(self.sensors.minTemp)
-                + " med:" + '{:.1f}'.format(self.sensors.medianTemp)
-                + " h:" + '{:.1f}'.format(self.sensors.maxTemp)
-                + " || min/max: " + '{:.1f}'.format(self.min)+ "/" + '{:.1f}'.format(self.max)
-                + " || count: " + str(len(self.sensors.deviceFolders))
-                + " || "
-                , end = "\033[37m"
+    def delayExceeded(self, lastReadTs):
+            return 
+
+    def displayTemps(self, message = ''):
+        self.lastDisplayTs = int(time.time())
+        self.io.displayTemps(
+                self.isHeatingRequired(),
+                self.heater.is_lit,
+                self.fan.is_lit,
+                self.light.is_lit,
+                self.dcPow.is_lit,
+                message
             )
 
-        temps = [0 for i in range(len(self.sensors.temps))]
-        for i, temp in enumerate(self.sensors.temps):
-            temps[i] = '{:.1f}'.format(temp)
-        print(temps, end = "")
+    def read(self):
+        self.sensors.readAll()
+        # self.displayDirectionChange()
 
-        print(" || RH: " + '{:.1f}'.format(self.sensors.humidity))
+    def displayDirectionChange(self):
+        monitoredTemp = self.sensors.temps[-1]
+        changed = monitoredTemp != self.lastMonitoredTemp
+        rising = monitoredTemp > self.lastMonitoredTemp
 
-    def tempsColour(self):
-        if self.coolingRequired():
-            return '\033[93m'
-        if self.heater.is_lit:
-            return '\033[96m'
-        if self.heatingRequired():
-            return '\033[94m'
-        return '\033[32m'
-
-
-    def speakTemps(self):
-        espeak.synth("Current temps: max..")
-        espeak.synth('{:.1f}'.format(self.sensors.maxTemp))
-        espeak.synth("Current temps: mean. ")
-        espeak.synth('{:.1f}'.format(self.sensors.meanTemp))
-        espeak.synth("Current temps: min. ")
-        espeak.synth('{:.1f}'.format(self.sensors.meanTemp))
-        self.speakProbes()
-        espeak.synth("Overall max.")
-        espeak.synth('{:.1f}'.format(self.max))
-        espeak.synth("Overall min.")
-        espeak.synth('{:.1f}'.format(self.min))
-        time.sleep(1)
-        espeak.synth('Relative humidity ' + str(self.sensors.humidity) + ' %')
-
-    def speakProbes(self):
-        espeak.synth("Individual probes")
-        for i, temp in enumerate(self.sensors.temps):
-            espeak.synth("probe " + str(i))
-            espeak.synth('{:.1f}'.format(temp))
-
-    def soundAllarm(self):
-        i = 5
-        while i:
-            espeak.synth("Woooooop. Woooooop!")
-            time.sleep(1)
-            espeak.synth("Emergency")
-            time.sleep(1)
-            espeak.synth("Emergency!")
-            time.sleep(3)
-            i -= 1
-
-    def userInputs(self):
-        targetTemp = self.input("Enter target temperature. Default is " + str(self.targetTemp) + ": ")
-        if not targetTemp: targetTemp = self.targetTemp
-        
-        maxTargetTemp = self.input("Enter max target temperature. Default is " + str(self.maxTargetTemp) + ": ")
-        if not maxTargetTemp: maxTargetTemp = self.maxTargetTemp
-        
-        delay = self.input("Enter delay, seconds. Default is " + str(self.delay) + ": ")
-        if not delay: delay = self.delay
-
-        heaterDelay = self.input("Enter heater on time, default is " + str(self.heaterDelay) + ": ")
-        if not heaterDelay: heaterDelay = self.heaterDelay
-
-        heaterOnModulus = self.input("Heater on cycles, default is " + str(self.heaterOnCycles) + ": ")
-        if not heaterOnModulus: heaterOnModulus = self.heaterOnCycles
-
-        self.targetTemp = float(targetTemp)
-        self.delay = int(delay)
-        self.heaterDelay = int(heaterDelay)
-        self.heaterOnCycles = int(heaterOnModulus)
-        self.maxTargetTemp = max(self.targetTemp + 0.5, int(maxTargetTemp))
-
-        self.output(
-            "Target temperature is "
-                + str(self.targetTemp)
-                + " Max target temp is "
-                + str(self.maxTargetTemp)
-                + " and delay is "
-                + str(self.delay)
-                + " seconds. "
-                + " Heater on for " + str(self.heaterDelay)
-                + " seconds in " + str(self.heaterOnCycles) + " cycles."
-            )
-    
-    def input(self, string):
-        espeak.synth(string)
-        return input(string)
-
-    def output(self, string):
-        espeak.synth(string)
-        print(string)
-
-    def userOptions(self):
-        self.output("What do you want?")
-        request = self.input("T for temperatures, S for settings").lower()
-        self.matchRequest(request)
-
-    def matchRequest(self, request):
-        if request == "t":
-            self.displayTemps()
-            return self.speakTemps()
-        elif request == "s":
-            return self.userInputs()
-        else:
-            return self.output("Command not recognised")
-
-    def delayExceeded(self):
-        if self.heatingRequired():
-            return int(time.time()) - self.lastReadTs >= self.heaterDelay
-        else:    
-            return int(time.time()) - self.lastReadTs >= self.delay
+        if (changed and self.wasRising != rising):
+            if rising:
+                message = '+ '
+            else:
+                message = '- '
+            
+            self.displayTemps(message + str(self.lastMonitoredTemp) + ' ' + str(monitoredTemp) + ' ')
+            self.wasRising = rising
+            
+        self.lastMonitoredTemp = monitoredTemp
 
     def run(self):
         try:
             while True:
-                self.lastReadTs = int(time.time())
+                self.delayTen()
                 self.read()
                 self.action()
-                self.displayTemps()
-                while(not self.delayExceeded()):
-                    time.sleep(0.1)
+                
+
         except KeyboardInterrupt:
             self.allOff()
-            self.userOptions()
+            self.io.userOptions()
         except:
             self.allOff()
-            self.output("FAILURE!")
-            self.soundAllarm()
+            self.io.output("FAILURE!")
+            self.io.soundAllarm()
             self.sensors = SensorRead.SensorRead()
 
+        self.displayTemps('^c')
         self.run()
+
+    def delayTen(self):
+        lastReadTs = int(time.time())
+        while (int(time.time()) - lastReadTs < self.readDelay
+                and int(time.time()) % 10 != 0):
+            time.sleep(0.1)

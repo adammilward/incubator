@@ -5,9 +5,9 @@
 # GND   x   15
 # HEAT  17  18
 #240 2  27  x
-#fan    22  23
-# fan  3.3  24
-#       10  G
+# fan   22  23
+#      3.3  24
+# led   10  G
 
 
 import Control
