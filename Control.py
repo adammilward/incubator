@@ -3,7 +3,7 @@ import time
 import SensorRead
 import UserIO
 from gpiozero import LED
-import statistics
+from datetime import datetime
 
 class Control:
     def __init__(self):
@@ -15,19 +15,24 @@ class Control:
         self.dcPow.off()
         self.fan.off()
         self.light.off()
-        
+
         self.heatingStartedTs = 0
-        self.lastDisplayTs = 0
         self.readDelay = 10
 
         self.sensors = SensorRead.SensorRead()
         self.lastMonitoredTemp = self.sensors.meanTemp
         self.rising = False
         self.wasRising = False
-        self.heatingWasActive = False
+
+        self.heaterWasOn = False
+        self.dcPowWasOn = False
+        self.fanWasOn = False
+        self.lightWasOn = False
+        self.heatingWasRequired = False
 
         self.io = UserIO.UserIO(self.sensors)
-        #self.io.userInputs()
+
+        self.lastDisplayTs = int(time.time()) - self.io.displayTempsTime
 
     def allOff(self):
         self.heater.off();
@@ -35,35 +40,66 @@ class Control:
         self.fan.off()
       
     def action(self):
+        self.heatAction()
+        self.fanAction()
+        self.lightAction()   
+        self.displayAction()
+
+        self.heaterWasOn = self.heater.is_lit
+        self.fanWasOn = self.fan.is_lit
+        self.lightWasOn = self.light.is_lit
+        self.dcPowWasOn = self.dcPow.is_lit
+        self.heatingWasRequired = self.isHeatingRequired() 
+
+    def heatAction(self):
         if self.isHeatingRequired():
             self.activateHeater()
         else:
             self.heaterOff()
-            #if (self.heatingWasActive != self.isHeatingRequired()):
-            #    self.displayTemps('a ')
 
-        if self.isCirculationRequired():
+    def fanAction(self):
+        if self.isFanRequired():
             self.fanOn()
         else:
             self.fanOff()
-            
-        self.displayAction()    
 
-        self.heatingWasActive = self.isHeatingRequired()
+    def lightAction(self):
+        if (not self.io.lightsActive):
+            self.lightOff()
+            return
+        
+        hour = int(datetime.now().strftime("%H"))
+        if (hour >= 7 and hour < 19):
+            self.lightOn()
+        else:
+            self.lightOff()        
 
     def displayAction(self):
+        elapsedSeconds = str(int(time.time()) - self.lastDisplayTs)
+        if (
+            self.heaterWasOn != self.heater.is_lit
+            or self.fanWasOn != self.fan.is_lit
+            or self.lightWasOn != self.light.is_lit
+            or self.dcPowWasOn != self.dcPow.is_lit
+            or self.heatingWasRequired != self.isHeatingRequired()
+            ):
+            self.displayTemps(elapsedSeconds)
+
         if (int(time.time()) - self.lastDisplayTs >= self.io.displayTempsTime):
-            self.lastDisplayTs = int(time.time())
-            self.displayTemps('..')
+            self.displayTemps('.' + elapsedSeconds)
 
     def isHeatingRequired(self):
-        return (self.sensors.maxTemp < self.io.maxTemp
-                and self.sensors.fruitMedian < self.io.targetFruitTemp
-                and self.sensors.spawnMedian < self.io.targetSpawnTemp)
+        hysteresis = int(self.heatingWasRequired) * 0.1
+        return (self.sensors.maxTemp < self.io.maxTemp + hysteresis
+                #and self.sensors.fruitMedian < self.io.targetFruitTemp + histerisis
+                and self.sensors.fruitMax < self.io.targetFruitTemp + 1 + hysteresis
+                and self.sensors.spawnMedian < self.io.targetSpawnTemp + hysteresis
+                and self.sensors.spawnMax < self.io.targetSpawnTemp + 2 + hysteresis)
 
-    def isCirculationRequired(self):
-        return (self.sensors.fruitMedian < self.io.targetFruitTemp
-                and self.sensors.fruitMax < self.io.targetFruitTemp + 1)
+    def isFanRequired(self):
+        hysteresis = int(self.fanWasOn) * 0.1
+        return (self.sensors.fruitMedian < self.io.targetFruitTemp + hysteresis
+                and self.sensors.fruitMax < self.io.targetFruitTemp + 1 + hysteresis)
 
     def activateHeater(self):
         if (int(time.time()) - self.heatingStartedTs >= self.io.heaterCycleTime):
@@ -75,28 +111,26 @@ class Control:
             self.heaterOff()
         
     def heaterOff(self):
-        if (self.heater.is_lit):
-            self.heater.off()
-            self.dcPowSupply()
-            self.displayTemps('b ')
+        self.heater.off()
     
     def heaterOn(self):
-        if (not self.heater.is_lit):
-            self.heater.on()
-            self.dcPowSupply()
-            self.displayTemps('c ')
+        self.heater.on()
 
     def fanOff(self):
-        if(self.dcPow.is_lit):
-            self.fan.off()
-            self.dcPowSupply()
-            self.displayTemps('d ')
+        self.fan.off()
+        self.dcPowSupply()
         
     def fanOn(self):
-        if(not self.dcPow.is_lit):
-            self.fan.on()
-            self.dcPowSupply()
-            self.displayTemps('e ')
+        self.fan.on()
+        self.dcPowSupply()
+
+    def lightOff(self):
+        self.light.off()
+        self.dcPowSupply()
+        
+    def lightOn(self):
+        self.light.on()
+        self.dcPowSupply()
 
     def dcPowSupply(self):
         if (self.fan.is_lit or self.light.is_lit):
@@ -104,12 +138,10 @@ class Control:
         else:
             self.dcPow.off()
 
-
-    def delayExceeded(self, lastReadTs):
-            return 
-
     def displayTemps(self, message = ''):
         self.lastDisplayTs = int(time.time())
+        while len(message) < 4 :
+            message = ' ' + message 
         self.io.displayTemps(
                 self.isHeatingRequired(),
                 self.heater.is_lit,
@@ -146,9 +178,9 @@ class Control:
                 self.read()
                 self.action()
                 
-
         except KeyboardInterrupt:
             self.allOff()
+            self.lightOn()
             self.io.userOptions()
         except:
             self.allOff()
@@ -160,7 +192,5 @@ class Control:
         self.run()
 
     def delayTen(self):
-        lastReadTs = int(time.time())
-        while (int(time.time()) - lastReadTs < self.readDelay
-                and int(time.time()) % 10 != 0):
+        while (int(str(int(time.time()))[-1]) < 5):
             time.sleep(0.1)

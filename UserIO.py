@@ -13,10 +13,12 @@ class UserIO:
         self.targetSpawnTemp = 25
         self.maxTemp = 29
 
-        self.heaterOnTime = 60
+        self.heaterOnTime = 80
         self.heaterCycleTime = 10 * 60
 
-        self.displayTempsTime = 60
+        self.displayTempsTime = 600
+
+        self.lightsActive = False
 
         self.RED = '\033[91m'
         self.GREEN = '\033[92m'
@@ -49,7 +51,7 @@ class UserIO:
 
         print(self.tempsColour(heatingRequired, heaterIsOn, fanIsOn), end = '')
         print(
-            message
+            message + ' '
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
                 + str(self.tempStatus(heatingRequired, heaterIsOn, fanIsOn)) + " | "  
                 + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn) + " | "  
@@ -140,13 +142,21 @@ class UserIO:
             i -= 1
 
     def userInputs(self):
-        targetFruitTemp = self.input("Enter max temperature. Default is " + str(self.targetFruitTemp) + ": ")
+        if self.lightsActive:
+            lightsDefault = 'yes'
+        else:
+            lightsDefault = 'no'
+
+        lightsActive = self.input("Activate Lighting. Default is " + lightsDefault + ": ")
+        if not lightsActive: lightsActive = str(int(self.lightsActive))
+
+        targetFruitTemp = self.input("Enter fruit target temp. Default is " + str(self.targetFruitTemp) + ": ")
         if not targetFruitTemp: targetFruitTemp = self.targetFruitTemp
 
-        targetSpawnTemp = self.input("Enter max temperature. Default is " + str(self.targetSpawnTemp) + ": ")
+        targetSpawnTemp = self.input("Enter spawn target temp. Default is " + str(self.targetSpawnTemp) + ": ")
         if not targetSpawnTemp: targetSpawnTemp = self.targetSpawnTemp
 
-        maxTemp = self.input("Enter max temperature. Default is " + str(self.maxTemp) + ": ")
+        maxTemp = self.input("Enter overall max temp. Default is " + str(self.maxTemp) + ": ")
         if not maxTemp: maxTemp = self.maxTemp
 
         heaterOnTime = self.input("Enter heater on time, default is " + str(self.heaterOnTime) + ": ")
@@ -155,7 +165,7 @@ class UserIO:
         heaterCycleTime = self.input("Heater cycle time, default is " + str(self.heaterCycleTime) + ": ")
         if not heaterCycleTime: heaterCycleTime = self.heaterCycleTime
 
-        displayTempsTime = self.input("Heater cycle time, default is " + str(self.displayTempsTime) + ": ")
+        displayTempsTime = self.input("Display temps time, default is " + str(self.displayTempsTime) + ": ")
         if not displayTempsTime: displayTempsTime = self.displayTempsTime
 
         self.targetFruitTemp = float(targetFruitTemp)
@@ -165,25 +175,30 @@ class UserIO:
         self.heaterCycleTime = int(heaterCycleTime)
         self.displayTempsTime = int(displayTempsTime)
 
+        self.lightsActive = (lightsActive == '1' or lightsActive[0].lower() == 'y')
+
         self.output(
             ''
-                + " Fruit target temp is "
+                + "Lighting active is "
+                + str(self.lightsActive)
+                + ", Fruit target temp is "
                 + str(self.targetFruitTemp)
-                + " Spawn target temp is "
+                + ", Spawn target temp is "
                 + str(self.targetSpawnTemp)
-                + " Max temperature is "
+                + ", Max temperature is "
                 + str(self.maxTemp)
-                + " Heater on for " + str(self.heaterOnTime)
+                + ", Heater on for " + str(self.heaterOnTime)
                 + " seconds in " + str(self.heaterCycleTime) + " seconds."
             )
     
     def input(self, string):
-        #espeak.synth(string)
-        return input(string)
+        print(string, end = ': ')
+        espeak.synth(string)
+        return input()
 
     def output(self, string):
-        #espeak.synth(string)
         print(string)
+        espeak.synth(string)
 
     def userOptions(self):
         self.output("What do you want?")
