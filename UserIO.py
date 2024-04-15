@@ -13,9 +13,7 @@ class UserIO:
         self.targetSpawnTemp = 25
         self.maxTemp = 29
 
-        self.heaterOnTime = 80
-        self.heaterCycleTime = 10 * 60
-
+        self.heaterOnPercent = 9
         self.displayTempsTime = 600
 
         self.lightsActive = False
@@ -25,6 +23,7 @@ class UserIO:
         self.DARKGREEN = '\033[32m'
         self.YELLOW = '\033[93m'
         self.BLUE = '\033[94m'
+
         self.PURPLE = '\033[95m'
         self.CYAN = '\033[96m'
         self.DARKCYAN = '\033[36m'
@@ -46,15 +45,27 @@ class UserIO:
             fanIsOn,
             lightIsOn,
             dcPowIsOn,
-            message = ''
+            elapsedSeconds: str,
+            heaterCycleCount: str,
+            message: str = ''
         ):
+
+        while len(message) < 4 :
+            message = ' ' + message
+        while len(elapsedSeconds) < 3 :
+            elapsedSeconds = ' ' + elapsedSeconds 
+        while len(heaterCycleCount) < 2 :
+            heaterCycleCount = ' ' + heaterCycleCount 
 
         print(self.tempsColour(heatingRequired, heaterIsOn, fanIsOn), end = '')
         print(
-            message + ' '
+                message 
+                + elapsedSeconds + ' | '
+                + heaterCycleCount + ' | '
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
-                + str(self.tempStatus(heatingRequired, heaterIsOn, fanIsOn)) + " | "  
-                + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn) + " | "  
+                + str(self.tempStatus(heatingRequired, heaterIsOn, fanIsOn)) + " | "
+                + str(self.heaterOnPercent) + '% | '
+                + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn) + " |"  
                 + " l:" + '{:.1f}'.format(self.sensors.minTemp)
                 + " med:" + '{:.1f}'.format(self.sensors.medianTemp)
                 + " mean:" + '{:.2f}'.format(self.sensors.meanTemp)
@@ -159,11 +170,8 @@ class UserIO:
         maxTemp = self.input("Enter overall max temp. Default is " + str(self.maxTemp) + ": ")
         if not maxTemp: maxTemp = self.maxTemp
 
-        heaterOnTime = self.input("Enter heater on time, default is " + str(self.heaterOnTime) + ": ")
-        if not heaterOnTime: heaterOnTime = self.heaterOnTime
-
-        heaterCycleTime = self.input("Heater cycle time, default is " + str(self.heaterCycleTime) + ": ")
-        if not heaterCycleTime: heaterCycleTime = self.heaterCycleTime
+        heaterOnPercent = self.input("Enter heater on percent, default is " + str(self.heaterOnPercent) + ": ")
+        if not heaterOnPercent: heaterOnPercent = self.heaterOnPercent
 
         displayTempsTime = self.input("Display temps time, default is " + str(self.displayTempsTime) + ": ")
         if not displayTempsTime: displayTempsTime = self.displayTempsTime
@@ -171,8 +179,7 @@ class UserIO:
         self.targetFruitTemp = float(targetFruitTemp)
         self.targetSpawnTemp = float(targetSpawnTemp)
         self.maxTemp = float(maxTemp)
-        self.heaterOnTime = int(heaterOnTime)
-        self.heaterCycleTime = int(heaterCycleTime)
+        self.heaterOnPercent = int(heaterOnPercent)
         self.displayTempsTime = int(displayTempsTime)
 
         self.lightsActive = (lightsActive == '1' or lightsActive[0].lower() == 'y')
@@ -187,12 +194,12 @@ class UserIO:
                 + str(self.targetSpawnTemp)
                 + ", Max temperature is "
                 + str(self.maxTemp)
-                + ", Heater on for " + str(self.heaterOnTime)
-                + " seconds in " + str(self.heaterCycleTime) + " seconds."
+                + ", Heater on " + str(self.heaterOnPercent)
+                + "%"
             )
     
     def input(self, string):
-        print(string, end = ': ')
+        print(string, end = '')
         espeak.synth(string)
         return input()
 

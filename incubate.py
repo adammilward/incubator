@@ -14,7 +14,7 @@ import Control
 
 control = Control.Control();
 
-#control.read()
+control.read()
 #control.action()
 #control.output()
 
