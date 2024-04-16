@@ -4,6 +4,7 @@ import SensorRead
 import UserIO
 from gpiozero import LED
 from datetime import datetime
+import math
 
 class Control:
     def __init__(self):
@@ -17,8 +18,8 @@ class Control:
         self.light.off()
 
         self.heatingPeriodStartTs = 0
-        self.heaterCycleCount = 1
-        self.readDelay = 19
+        self.heatingPeriod = 600
+        self.heaterCycleCount = 0
 
         self.sensors = SensorRead.SensorRead()
         self.lastMonitoredTemp = self.sensors.meanTemp
@@ -52,37 +53,56 @@ class Control:
             self.heaterInactive()
 
     def activateHeater(self):
-        if (int(time.time()) - self.heatingPeriodStartTs >= 100):
+        if (int(time.time()) - self.heatingPeriodStartTs >= self.heatingPeriod):
+            self.heaterCycleCount += 1
             self.heatingPeriodStartTs = int(time.time())
-            heaterOnSeconds = self.io.heaterOnPercent
+            heaterOnSeconds = self.io.heaterOnPercent * self.heatingPeriod / 100
 
-            if (self.heaterCycleCount >= 20 and self.heaterCycleCount % 10 == 0):
+            if (self.heaterCycleCount >= 2 
+                and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.1):
                 self.io.heaterOnPercent += 1
 
-            if (self.heaterCycleCount == 0) :
-                heaterOnSeconds = heaterOnSeconds * 5
+            if heaterOnSeconds > 120:
+                raise Exception("heaterOnSeconds out of range: " + str(heaterOnSeconds))
 
             self.heaterOn()
             self.displayAction()
             time.sleep(heaterOnSeconds)
             self.heaterOff()
             self.displayAction()
-            self.heaterCycleCount += 1 
 
     def heaterInactive(self):
-        if (self.heaterCycleCount > 0):
-            if self.heaterCycleCount <= 20:
-                    #print(self.io.heaterOnPercent, '*', multiplier, '=', int(self.io.heaterOnPercent * multiplier))
-                if(self.heaterCycleCount < 5):
-                    self.io.heaterOnPercent -= 4
-                elif(self.heaterCycleCount < 10):
-                    self.io.heaterOnPercent -= 2
-                elif(self.heaterCycleCount < 15):
-                    self.io.heaterOnPercent -= 1
-                elif(self.heaterCycleCount < 20):
-                    self.io.heaterOnPercent -= 0
+        if (self.heaterCycleCount != -1):
+            elapsedSeconds = int(time.time()) - self.heatingPeriodStartTs
+            modifier = (elapsedSeconds) / self.heatingPeriod
+            
+            if(self.heaterCycleCount == 0
+               and elapsedSeconds < 0.8 * self.heatingPeriod):
+                modifier = math.sqrt(math.sqrt(modifier))
+                if modifier < 0.5 :
+                    modifier = 0.5
+                self.io.heaterOnPercent = self.io.heaterOnPercent * modifier
+            elif(self.heaterCycleCount == 1
+                and elapsedSeconds < 0.8 * self.heatingPeriod):
+                modifier = math.sqrt(math.sqrt(math.sqrt(modifier)))
 
-            self.heaterCycleCount = 0
+            self.heaterCycleCount = -1
+
+
+    def isHeatingRequired(self):
+        hysteresis = int(self.heatingWasRequired) * 0.1
+        return (self.sensors.maxTemp < self.io.maxTemp + hysteresis
+                and self.sensors.spawnMedian < self.io.targetSpawnTemp + hysteresis
+                and self.sensors.spawnMax < self.io.targetSpawnTemp + 1 + hysteresis
+                # incase somehing went wrong and he fruit is geing too hot
+                and self.sensors.fruitMedian < self.io.targetFruitTemp + 1 + hysteresis
+                #and self.sensors.fruitMedian < self.io.targetFruitTemp + histerisis
+                )
+
+    def isFanRequired(self):
+        hysteresis = int(self.fanWasOn) * 0.1
+        return (self.sensors.fruitMedian < self.io.targetFruitTemp + hysteresis
+                and self.sensors.fruitMax < self.io.targetFruitTemp + 1 + hysteresis)
 
     def fanAction(self):
         if self.isFanRequired():
@@ -110,6 +130,11 @@ class Control:
             or self.heatingWasRequired != self.isHeatingRequired()
             ):
             self.displayTemps('  ')
+            #if (not self.isHeatingRequired()):
+                # print(self.sensors.maxTemp, self.io.maxTemp + 0.1, self.sensors.maxTemp < self.io.maxTemp + 0.1, 
+                # ' ... ', self.sensors.spawnMedian, self.io.targetSpawnTemp + 0.1, self.sensors.spawnMedian < self.io.targetSpawnTemp + 0.1,
+                # ' ... ', self.sensors.spawnMax, self.io.targetSpawnTemp + 1.1, self.sensors.spawnMax < self.io.targetSpawnTemp + 1.1,
+                # ' ... ', self.sensors.fruitMedian, self.io.targetFruitTemp + 1.1, self.sensors.fruitMedian < self.io.targetFruitTemp + 1.1)
 
         if (int(time.time()) - self.lastDisplayTs >= self.io.displayTempsTime):
             self.displayTemps('..')
@@ -119,19 +144,6 @@ class Control:
         self.lightWasOn = self.light.is_lit
         self.dcPowWasOn = self.dcPow.is_lit
         self.heatingWasRequired = self.isHeatingRequired()     
-
-    def isHeatingRequired(self):
-        hysteresis = int(self.heatingWasRequired) * 0.1
-        return (self.sensors.maxTemp < self.io.maxTemp + hysteresis
-                #and self.sensors.fruitMedian < self.io.targetFruitTemp + histerisis
-                and self.sensors.fruitMax < self.io.targetFruitTemp + 1 + hysteresis
-                and self.sensors.spawnMedian < self.io.targetSpawnTemp + hysteresis
-                and self.sensors.spawnMax < self.io.targetSpawnTemp + 1 + hysteresis)
-
-    def isFanRequired(self):
-        hysteresis = int(self.fanWasOn) * 0.1
-        return (self.sensors.fruitMedian < self.io.targetFruitTemp + hysteresis
-                and self.sensors.fruitMax < self.io.targetFruitTemp + 1 + hysteresis)
         
     def heaterOff(self):
         self.heater.off()
@@ -207,13 +219,14 @@ class Control:
                 
         except KeyboardInterrupt:
             self.allOff()
-            print('allOff')
             self.lightOn()
+            self.io.output('allOff', 'keyboardInterrupt')
             self.io.userOptions()
-        except:
+        except Exception as e:
             self.allOff()
-            print('allOff')
+            self.io.output('allOff')
             self.io.output("FAILURE!")
+            self.io.output(str(e))
             self.io.soundAllarm()
             self.sensors = SensorRead.SensorRead()
 

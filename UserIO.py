@@ -13,7 +13,7 @@ class UserIO:
         self.targetSpawnTemp = 25
         self.maxTemp = 29
 
-        self.heaterOnPercent = 9
+        self.heaterOnPercent = 19
         self.displayTempsTime = 600
 
         self.lightsActive = False
@@ -64,7 +64,7 @@ class UserIO:
                 + heaterCycleCount + ' | '
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
                 + str(self.tempStatus(heatingRequired, heaterIsOn, fanIsOn)) + " | "
-                + str(self.heaterOnPercent) + '% | '
+                + str(round(self.heaterOnPercent, 1)) + '% | '
                 + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn) + " |"  
                 + " l:" + '{:.1f}'.format(self.sensors.minTemp)
                 + " med:" + '{:.1f}'.format(self.sensors.medianTemp)
@@ -75,7 +75,7 @@ class UserIO:
                 + '{:.1f}'.format(self.sensors.spawnMedian) + '(' + str(self.targetSpawnTemp) + ') '
                 + '{:.1f}'.format(self.sensors.maxTemp) + '(' + str(self.maxTemp) + ') '
                 + "|| "
-                , end = "\033[37m"
+                , end = ""
             )
 
         temps = [0 for i in range(len(self.sensors.temps))]
@@ -83,7 +83,8 @@ class UserIO:
             temps[i] = '{:.1f}'.format(temp)
         print(temps, end = "")
 
-        print(" || RH: " + '{:.1f}'.format(self.sensors.humidity))
+        print(" || RH: " + '{:.1f}'.format(self.sensors.humidity), end = '')
+        print("\033[37m")
 
     def tempStatus(self, heatingRequired, heaterIsOn, fanIsOn):
         temp = 'ok'
