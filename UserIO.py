@@ -9,28 +9,58 @@ class UserIO:
 
         # 25/26 for spawn, 21 air temp for fruiting, 23 (max 24) for substrate
 
-        self.targetFruitTemp = 22
+        self.targetFruitTemp = 21.5
         self.targetSpawnTemp = 25
         self.maxTemp = 29
 
-        self.heaterOnPercent = 19
+        self.heaterOnPercent = 10
         self.displayTempsTime = 600
 
         self.lightsActive = False
 
-        self.RED = '\033[91m'
-        self.GREEN = '\033[92m'
-        self.DARKGREEN = '\033[32m'
-        self.YELLOW = '\033[93m'
-        self.BLUE = '\033[94m'
+        self.END      = '\33[0m'
+        self.BOLD     = '\33[1m'
+        self.ITALIC   = '\33[3m'
+        self.URL      = '\33[4m'
+        self.BLINK    = '\33[5m'
+        self.BLINK2   = '\33[6m'
+        self.SELECTED = '\33[7m'
 
-        self.PURPLE = '\033[95m'
-        self.CYAN = '\033[96m'
-        self.DARKCYAN = '\033[36m'
+        self.BLACK  = '\33[30m'
+        self.RED    = '\33[31m'
+        self.GREEN  = '\33[32m'
+        self.YELLOW = '\33[33m'
+        self.BLUE   = '\33[34m'
+        self.VIOLET = '\33[35m'
+        self.CYAN  = '\33[36m'
+        self.WHITE  = '\33[37m'
 
-        self.BOLD = '\033[1m'
-        self.UNDERLINE = '\033[4m'
-        self.END = '\033[0m'
+        self.BLACKBG  = '\33[40m'
+        self.REDBG    = '\33[41m'
+        self.GREENBG  = '\33[42m'
+        self.YELLOWBG = '\33[43m'
+        self.BLUEBG   = '\33[44m'
+        self.VIOLETBG = '\33[45m'
+        self.BEIGEBG  = '\33[46m'
+        self.WHITEBG  = '\33[47m'
+
+        self.GREY    = '\33[90m'
+        self.RED2    = '\33[91m'
+        self.GREEN2  = '\33[92m'
+        self.YELLOW2 = '\33[93m'
+        self.BLUE2   = '\33[94m'
+        self.VIOLET2 = '\33[95m'
+        self.CYAN2  = '\33[96m'
+        self.WHITE2  = '\33[97m'
+
+        self.GREYBG    = '\33[100m'
+        self.REDBG2    = '\33[101m'
+        self.GREENBG2  = '\33[102m'
+        self.YELLOWBG2 = '\33[103m'
+        self.BLUEBG2   = '\33[104m'
+        self.VIOLETBG2 = '\33[105m'
+        self.BEIGEBG2  = '\33[106m'
+        self.WHITEBG2  = '\33[107m'
 
     def status(self, appliance):
             if appliance:
@@ -65,26 +95,49 @@ class UserIO:
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
                 + str(self.tempStatus(heatingRequired, heaterIsOn, fanIsOn)) + " | "
                 + str(round(self.heaterOnPercent, 1)) + '% | '
-                + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn) + " |"  
-                + " l:" + '{:.1f}'.format(self.sensors.minTemp)
-                + " med:" + '{:.1f}'.format(self.sensors.medianTemp)
-                + " mean:" + '{:.2f}'.format(self.sensors.meanTemp)
-                + " h:" + '{:.1f}'.format(self.sensors.maxTemp)
-                + " | targets: "
-                + '{:.1f}'.format(self.sensors.fruitMedian) + '(' + str(self.targetFruitTemp) + ') ' 
-                + '{:.1f}'.format(self.sensors.spawnMedian) + '(' + str(self.targetSpawnTemp) + ') '
-                + '{:.1f}'.format(self.sensors.maxTemp) + '(' + str(self.maxTemp) + ') '
-                + "|| "
+                + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn)
+                + self.targets()
                 , end = ""
             )
-
-        temps = [0 for i in range(len(self.sensors.temps))]
-        for i, temp in enumerate(self.sensors.temps):
-            temps[i] = '{:.1f}'.format(temp)
-        print(temps, end = "")
+    
+        temps = ['' for i in range(len(self.sensors.temps))]
+        print(self.colourTemp(self.sensors.temps[0], self.targetFruitTemp), end = '')
+        print(self.colourTemp(self.sensors.temps[1], self.targetFruitTemp), end = '')
+        print(self.colourTemp(self.sensors.temps[2], self.targetFruitTemp), end = '')
+        print(self.colourTemp(self.sensors.temps[3], self.targetSpawnTemp), end = '')
+        print(self.colourTemp(self.sensors.temps[4], self.targetSpawnTemp), end = '')
+        print(self.colourTemp(self.sensors.temps[5], self.targetSpawnTemp), end = '')
+        print(self.colourTemp(self.sensors.temps[6], self.maxTemp), end = '')
+        
 
         print(" || RH: " + '{:.1f}'.format(self.sensors.humidity), end = '')
-        print("\033[37m")
+        print(self.END)
+
+    def targets(self,):
+        a = self.colourTempTarget(self.sensors.fruitMedian, self.targetFruitTemp)
+        b = self.colourTempTarget(self.sensors.spawnMedian, self.targetSpawnTemp)
+        c = self.colourTempTarget(self.sensors.maxTemp, self.maxTemp)
+        return f" | targets: {a} {b} | {self.END}"  
+
+    def colourTemp(self, temp, target):
+        return f"{self.targetColour(temp, target)} {temp} {self.END} "
+
+    def colourTempTarget(self, temp, target):
+        return f"{self.targetColour(temp, target)}{temp}({target}){self.END}"
+
+    def targetColour(self, temp, target):
+        if temp <= target - 0.4:
+            return self.BLUE2
+        elif temp <= target - 0.2:
+            return self.CYAN2
+        elif temp >= target + 0.4:
+            return self.RED2
+        elif temp >= target + 0.2:
+            return self.YELLOW2
+        elif temp <= target + 0.1 and temp >= target - 0.1:
+            return self.GREEN2
+        
+        return self.REDBG
 
     def tempStatus(self, heatingRequired, heaterIsOn, fanIsOn):
         temp = 'ok'
@@ -111,14 +164,14 @@ class UserIO:
 
     def tempsColour(self, heatingRequired, heaterIsOn, fanIsOn):
         if fanIsOn and heaterIsOn:
-            return self.PURPLE
+            return self.VIOLET2
         if fanIsOn:
-            return self.YELLOW
+            return self.YELLOW2
         if heaterIsOn:
-            return self.RED
+            return self.RED2
         if heatingRequired:
-            return self.CYAN
-        return self.DARKGREEN
+            return self.CYAN2
+        return self.GREEN
 
 
     def speakTemps(self):
@@ -180,7 +233,7 @@ class UserIO:
         self.targetFruitTemp = float(targetFruitTemp)
         self.targetSpawnTemp = float(targetSpawnTemp)
         self.maxTemp = float(maxTemp)
-        self.heaterOnPercent = int(heaterOnPercent)
+        self.heaterOnPercent = float(heaterOnPercent)
         self.displayTempsTime = int(displayTempsTime)
 
         self.lightsActive = (lightsActive == '1' or lightsActive[0].lower() == 'y')

@@ -18,8 +18,8 @@ class Control:
         self.light.off()
 
         self.heatingPeriodStartTs = 0
-        self.heatingPeriod = 600
-        self.heaterCycleCount = 0
+        self.heatingPeriod = 10 * 60
+        self.heaterCycleCount = -1
 
         self.sensors = SensorRead.SensorRead()
         self.lastMonitoredTemp = self.sensors.meanTemp
@@ -60,11 +60,11 @@ class Control:
 
             if (self.heaterCycleCount >= 2 
                 and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.1):
-                self.io.heaterOnPercent += 1
+                self.io.heaterOnPercent += 0.5
 
-            if heaterOnSeconds > 120:
+            if heaterOnSeconds > 200:
                 raise Exception("heaterOnSeconds out of range: " + str(heaterOnSeconds))
-
+ 
             self.heaterOn()
             self.displayAction()
             time.sleep(heaterOnSeconds)
@@ -76,15 +76,18 @@ class Control:
             elapsedSeconds = int(time.time()) - self.heatingPeriodStartTs
             modifier = (elapsedSeconds) / self.heatingPeriod
             
-            if(self.heaterCycleCount == 0
-               and elapsedSeconds < 0.8 * self.heatingPeriod):
-                modifier = math.sqrt(math.sqrt(modifier))
-                if modifier < 0.5 :
-                    modifier = 0.5
+            if(self.heaterCycleCount == 0):
+                modifier = math.sqrt(modifier)
+                modifier = modifier / 2 + 0.5
                 self.io.heaterOnPercent = self.io.heaterOnPercent * modifier
-            elif(self.heaterCycleCount == 1
-                and elapsedSeconds < 0.8 * self.heatingPeriod):
-                modifier = math.sqrt(math.sqrt(math.sqrt(modifier)))
+            elif(self.heaterCycleCount == 1):
+                modifier = math.sqrt(math.sqrt(modifier))
+                modifier = modifier / 2 + 0.5
+                self.io.heaterOnPercent = self.io.heaterOnPercent * modifier
+            else:
+                modifier = math.sqrt(modifier)
+                modifier = modifier / 2 + 0.5
+                self.io.heaterOnPercent = self.io.heaterOnPercent * modifier
 
             self.heaterCycleCount = -1
 
@@ -95,11 +98,12 @@ class Control:
                 and self.sensors.spawnMedian < self.io.targetSpawnTemp + hysteresis
                 and self.sensors.spawnMax < self.io.targetSpawnTemp + 1 + hysteresis
                 # incase somehing went wrong and he fruit is geing too hot
-                and self.sensors.fruitMedian < self.io.targetFruitTemp + 1 + hysteresis
-                #and self.sensors.fruitMedian < self.io.targetFruitTemp + histerisis
+                #and self.sensors.fruitMedian < self.io.targetFruitTemp + 1 + hysteresis
+                and self.sensors.fruitMedian < self.io.targetFruitTemp + hysteresis
                 )
 
     def isFanRequired(self):
+        return False
         hysteresis = int(self.fanWasOn) * 0.1
         return (self.sensors.fruitMedian < self.io.targetFruitTemp + hysteresis
                 and self.sensors.fruitMax < self.io.targetFruitTemp + 1 + hysteresis)
@@ -220,7 +224,7 @@ class Control:
         except KeyboardInterrupt:
             self.allOff()
             self.lightOn()
-            self.io.output('allOff', 'keyboardInterrupt')
+            self.io.output('allOff, KeyboardInterrupt')
             self.io.userOptions()
         except Exception as e:
             self.allOff()
