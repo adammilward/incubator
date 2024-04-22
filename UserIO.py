@@ -11,9 +11,9 @@ class UserIO:
 
         self.targetFruitTemp = 21.5
         self.targetSpawnTemp = 25
-        self.maxTemp = 29
+        self.maxTemp = 27
 
-        self.heaterOnPercent = 10
+        self.heaterOnPercent = 6
         self.displayTempsTime = 600
 
         self.lightsActive = False
@@ -126,18 +126,23 @@ class UserIO:
         return f"{self.targetColour(temp, target)}{temp}({target}){self.END}"
 
     def targetColour(self, temp, target):
-        if temp <= target - 0.4:
+        if temp <= target + 0.1 and temp >= target - 0.1:
+            return self.GREEN
+        elif temp <= target - 1:
+            return self.BLUEBG
+        elif temp <= target - 0.5:
             return self.BLUE2
         elif temp <= target - 0.2:
             return self.CYAN2
-        elif temp >= target + 0.4:
+        
+        elif temp >= target + 1:
+            return self.REDBG
+        elif temp >= target + 0.5:
             return self.RED2
         elif temp >= target + 0.2:
             return self.YELLOW2
-        elif temp <= target + 0.1 and temp >= target - 0.1:
-            return self.GREEN2
-        
-        return self.REDBG
+        else:
+            return self.BLINK2
 
     def tempStatus(self, heatingRequired, heaterIsOn, fanIsOn):
         temp = 'ok'
