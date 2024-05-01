@@ -93,21 +93,21 @@ class Control:
 
 
     def isHeatingRequired(self):
-        hysteresis = int(self.heatingWasRequired) * 0.2
+        hysteresis = int(self.heatingWasRequired) * 0
         error = 0.1
         return (self.sensors.maxTemp < self.io.maxTemp - error + hysteresis
                 and self.sensors.spawnMedian < self.io.targetSpawnTemp - error + hysteresis
                 and self.sensors.spawnMax < self.io.targetSpawnTemp + 1 - error + hysteresis
                 # incase somehing went wrong and he fruit is geing too hot
-                and self.sensors.fruitMax < self.io.targetFruitTemp + 1 - error + hysteresis
+                and self.sensors.fruitMax < self.io.targetFruitTemp + 0.8 - error + hysteresis
                 #and self.sensors.fruitMedian < self.io.targetFruitTemp - error + hysteresis
                 )
 
     def isFanRequired(self):
         hysteresis = int(self.fanWasOn) * 0.2
-        error = 0.1
+        error = 0
         return (self.sensors.fruitMedian < self.io.targetFruitTemp - error + hysteresis
-                and self.sensors.fruitMax < self.io.targetFruitTemp + 1 - error + hysteresis)
+                and self.sensors.fruitMax < self.io.targetFruitTemp + 0.3 - error + hysteresis)
 
     def fanAction(self):
         if self.isFanRequired():

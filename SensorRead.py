@@ -33,6 +33,7 @@ class SensorRead:
 
         print("Found folders: ")
         print(self.deviceFolders)
+        self.readAll()
 
     def readAll(self):
         self.readHumidity()

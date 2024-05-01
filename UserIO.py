@@ -13,7 +13,7 @@ class UserIO:
         self.targetSpawnTemp = 25
         self.maxTemp = 27
 
-        self.heaterOnPercent = 6
+        self.heaterOnPercent = 8
         self.displayTempsTime = 600
 
         self.lightsActive = False
