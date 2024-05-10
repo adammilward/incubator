@@ -13,8 +13,14 @@ class UserIO:
         self.targetSpawnTemp = 25
         self.maxTemp = 27
 
-        self.heaterOnPercent = 8
+        self.heaterOnPercent = 4
         self.displayTempsTime = 600
+        self.heatingPeriod = 10 * 60
+
+        self.spawnHysteresis = 0
+        self.spawnMaxOffset = 0.8
+        self.fruitHysteresis = 0.2
+        self.fruitMaxOffset = 0.5
 
         self.lightsActive = False
 
@@ -32,7 +38,7 @@ class UserIO:
         self.YELLOW = '\33[33m'
         self.BLUE   = '\33[34m'
         self.VIOLET = '\33[35m'
-        self.CYAN  = '\33[36m'
+        self.CYAN   = '\33[36m'
         self.WHITE  = '\33[37m'
 
         self.BLACKBG  = '\33[40m'
@@ -50,7 +56,7 @@ class UserIO:
         self.YELLOW2 = '\33[93m'
         self.BLUE2   = '\33[94m'
         self.VIOLET2 = '\33[95m'
-        self.CYAN2  = '\33[96m'
+        self.CYAN2   = '\33[96m'
         self.WHITE2  = '\33[97m'
 
         self.GREYBG    = '\33[100m'
@@ -94,53 +100,56 @@ class UserIO:
                 + heaterCycleCount + ' | '
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
                 + str(self.tempStatus(heatingRequired, heaterIsOn, fanIsOn)) + " | "
-                + str(round(self.heaterOnPercent, 1)) + '% | '
+                + str(round(self.heaterOnPercent, 1)) + '% ' 
+                + str(self.heaterOnPercent * self.heatingPeriod / 100) + 's | '
                 + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn)
                 + self.targets()
                 , end = ""
             )
     
         temps = ['' for i in range(len(self.sensors.temps))]
-        print(self.colourTemp(self.sensors.temps[0], self.targetFruitTemp), end = '')
-        print(self.colourTemp(self.sensors.temps[1], self.targetFruitTemp), end = '')
-        print(self.colourTemp(self.sensors.temps[2], self.targetFruitTemp), end = '')
-        print(self.colourTemp(self.sensors.temps[3], self.targetSpawnTemp), end = '')
-        print(self.colourTemp(self.sensors.temps[4], self.targetSpawnTemp), end = '')
-        print(self.colourTemp(self.sensors.temps[5], self.targetSpawnTemp), end = '')
-        print(self.colourTemp(self.sensors.temps[6], self.maxTemp), end = '')
+        print(self.colourTemp(self.sensors.temps[0], self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset), end = '')
+        print(self.colourTemp(self.sensors.temps[1], self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset), end = '')
+        print(self.colourTemp(self.sensors.temps[2], self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset), end = '')
+        print(self.colourTemp(self.sensors.temps[3], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
+        print(self.colourTemp(self.sensors.temps[4], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
+        print(self.colourTemp(self.sensors.temps[5], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
+        print(end = self.END)
         
-
-        print(" || RH: " + '{:.1f}'.format(self.sensors.humidity), end = '')
+        print(" || T:", str(self.sensors.temps[6]) + ' RH: ' + '{:.1f}'.format(self.sensors.humidity), end = '')
         print(self.END)
 
     def targets(self,):
-        a = self.colourTempTarget(self.sensors.fruitMedian, self.targetFruitTemp)
-        b = self.colourTempTarget(self.sensors.spawnMedian, self.targetSpawnTemp)
-        c = self.colourTempTarget(self.sensors.maxTemp, self.maxTemp)
+        a = self.colourTempTarget(self.sensors.fruitMedian, self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset)
+        b = self.colourTempTarget(self.sensors.spawnMedian, self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset)
         return f" | targets: {a} {b} | {self.END}"  
 
-    def colourTemp(self, temp, target):
-        return f"{self.targetColour(temp, target)} {temp} {self.END} "
+    def colourTemp(self, temp, target, hysteresis, maxOffset):
+        return f"{self.targetColour(temp, target, hysteresis, maxOffset)} {temp} {self.END} "
 
-    def colourTempTarget(self, temp, target):
-        return f"{self.targetColour(temp, target)}{temp}({target}){self.END}"
+    def colourTempTarget(self, temp, target, hysteresis, maxOffset):
+        return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp}({target}){self.END}"
 
-    def targetColour(self, temp, target):
-        if temp <= target + 0.1 and temp >= target - 0.1:
-            return self.GREEN
-        elif temp <= target - 1:
+    def targetColour(self, temp, target, hysteresis, maxOffset):
+        if temp == target:
+            return self.GREEN + self.ITALIC
+        
+        if temp <= target - maxOffset - 1 :
             return self.BLUEBG
-        elif temp <= target - 0.5:
+        elif temp <= target - maxOffset:
             return self.BLUE2
-        elif temp <= target - 0.2:
+        elif temp <= target:
             return self.CYAN2
         
-        elif temp >= target + 1:
+        elif temp >= target + hysteresis + maxOffset + 1:
             return self.REDBG
-        elif temp >= target + 0.5:
+        elif temp >= target + hysteresis+ maxOffset:
             return self.RED2
-        elif temp >= target + 0.2:
+        elif temp >= target + hysteresis:
             return self.YELLOW2
+        elif temp >= target:
+            return self.GREEN
+        
         else:
             return self.BLINK2
 
@@ -178,9 +187,26 @@ class UserIO:
             return self.CYAN2
         return self.GREEN
 
+    def peakDetected(self, direction, i, detector):
+        temps = []
+        j = i
+        while j:
+            j -= 1
+            print('   ', end='')
+
+        for record in detector.history:
+            temps.append(record['temp'])
+        if (direction > 0):
+            print (self.BLUE2 , '                    ', i, datetime.now().strftime("| %H:%M:%S"), '| falling, max was:', detector.recentMax, end=' ')
+            print(temps, self.END)
+        elif (direction < 0):
+            print (self.RED2 ,  '                    ', i, datetime.now().strftime("| %H:%M:%S"), '| rising, min was:', detector.recentMin, end='')
+            print(temps, self.END)
+
 
     def speakTemps(self):
         espeak.synth("Current temps: max..")
+
         espeak.synth('{:.1f}'.format(self.sensors.maxTemp))
         espeak.synth("Current temps: mean. ")
         espeak.synth('{:.1f}'.format(self.sensors.meanTemp))

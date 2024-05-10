@@ -1,36 +1,60 @@
-import statistics
+import time
 
 class PeakDetect:
     def __init__(self) -> None:
         self.history = []
 
-        self.up = 'up'
-        self.down = 'down'
-        self.direction = ''
+        self.direction = 0
+        self.oldDirection = 0
 
-    def addValue(self, value):
-        if len(self.history) < 4:
+        self.recentMax = -10000
+        self.recentMin = 100000
+
+    def addValue(self, ts, temp):
+        value = {'ts': int(ts), 'temp': temp}
+        if len(self.history) < 3:
             self.history.append(value)
         else:
-            self.history = self.history[1:4] + [value]
+            self.history = self.history[1:] + [value]
 
     def detect(self):
-        if len(self.history) < 4:
-            print('short list')
+        if len(self.history) < 3:
             return False
         
-        if statistics.median(self.history[0:3]) > statistics.median(self.history[1:3]):
-            print ('dropping, ', statistics.median(self.history[0:3]), statistics.median(self.history[1:3]))
+        self.oldDirection = self.direction
+
+        new = []
+
+        for value in self.history:
+            new.append(value['temp'])
+
+        #print()
+        #print('old', old)
+        #print('new', new)
+
+        self.recentMax = max(self.recentMax, min(new))
+        self.recentMin = min(self.recentMin, max(new))
+
+        #print('max: ', self.recentMax, '    min: ', self.recentMin)
+
+        if max(new) < self.recentMax and self.direction > -1:
+            self.recentMin = max(new)
+            self.direction = -1
+            
         
-        print(self.history)
+        if min(new) > self.recentMin and self.direction < 1:
+            self.recentMax = min(new)
+            self.direction = 1
+
+        return self.oldDirection - self.direction
 
     def getValue(self):
         val = input('give me a value: ')
 
-        self.addValue(float(val))
+        try:
+            self.addValue(time.time(), float(val))
+        except:
+            self.getValue()
+
         self.detect()
         self.getValue()
-
-detector = PeakDetect()
-
-detector.getValue()

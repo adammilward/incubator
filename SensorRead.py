@@ -6,6 +6,8 @@ import statistics
 import json
 from pathlib import Path
 from datetime import datetime
+import PeakDetect
+import time
 
 os.system('modprobe w1-gpio')
 os.system('modprobe w1-therm')
@@ -30,6 +32,7 @@ class SensorRead:
         self.fruitMedian = 0
         self.minTemp = 0
         self.maxTemp = 0
+        self.detectors = [PeakDetect.PeakDetect() for i in range(tempsCount)]
 
         print("Found folders: ")
         print(self.deviceFolders)
@@ -38,6 +41,11 @@ class SensorRead:
     def readAll(self):
         self.readHumidity()
         self.readTemps()
+        self.detectPeaks()
+
+    def detectPeaks(self):
+        for i, temp in enumerate(self.temps):
+            self.detectors[i].addValue(time.time(), self.temps[i])
 
     def readHumidity(self):
         self.humidity = self.htSensor.relative_humidity
