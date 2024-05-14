@@ -13,11 +13,11 @@ class UserIO:
         self.targetSpawnTemp = 25
         self.maxTemp = 27
 
-        self.heaterOnPercent = 0.5
+        self.heaterOnPercent = 3
         self.heatingPeriod = 10 * 60
         self.displayTempsTime = self.heatingPeriod
 
-        self.spawnHysteresis = 0
+        self.spawnHysteresis = 0.1
         self.spawnMaxOffset = 0.8
         self.fruitHysteresis = 0.2
         self.fruitMaxOffset = 0.5
@@ -86,6 +86,10 @@ class UserIO:
             message: str = ''
         ):
         isHeatingRequired = len(dontHeatReasons) == 0
+
+        if not isHeatingRequired and heaterIsOn:
+            print(dontHeatReasons, heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn, elapsedSeconds, heaterCycleCount, message)
+            raise Exception('Heater should not be on!!!')
 
         while len(message) < 4 :
             message = ' ' + message

@@ -8,6 +8,8 @@ import math
 
 class Control:
     def __init__(self):
+        self.writeIncubateTs(10)
+
         self.heater = LED(17)
         self.dcPow = LED(27)
         self.fan = LED(22)
@@ -16,6 +18,7 @@ class Control:
         self.dcPow.off()
         self.fan.off()
         self.light.off()
+        self.lightOn()
 
         self.heatingPeriodStartTs = 0
         self.heaterCycleCount = -1
@@ -51,7 +54,7 @@ class Control:
         if (self.heater.is_lit 
             and self.sensors.maxTemp > self.io.targetSpawnTemp + self.io.spawnMaxOffset + 1):
             self.displayTemps('E')
-            Exception('Heater should not be on max temp is' + str(self.sensors.maxTemp))
+            raise Exception('Heater should not be on max temp is' + str(self.sensors.maxTemp))
 
 
     def heatAction(self):
@@ -112,18 +115,31 @@ class Control:
     def isHeatingRequired(self):
         self.dontHeatReasons = []
         hysteresis = int(self.heatingWasRequired) * self.io.spawnHysteresis
-        if (self.sensors.maxTemp >= self.io.maxTemp):
-            self.dontHeatReasons += ['sensors.maxTemp >= io.maxTemp ' + str(self.io.maxTemp)]
-        if (self.sensors.spawnMedian >= self.io.targetSpawnTemp + hysteresis):
-            self.dontHeatReasons += ['self.sensors.spawnMedian >= ' + str(self.io.targetSpawnTemp + hysteresis)]
-        if (self.sensors.spawnMax >= self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis):
-            self.dontHeatReasons += ['self.sensors.spawnMax >=' + str(self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis)]
-        if (self.sensors.fruitMax >= self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis):
-            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis)]
-        if (self.sensors.fruitMax >= self.io.targetFruitTemp + 2):
-            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(self.io.targetFruitTemp + 2)]
-        if (self.sensors.maxTemp >= self.io.targetSpawnTemp + 2):
-            self.dontHeatReasons += ['self.sensors.maxTemp >= ' + str(self.io.targetSpawnTemp + 2)]
+
+        val = self.io.maxTemp + hysteresis
+        if (self.sensors.maxTemp >= val):
+            self.dontHeatReasons += ['sensors.maxTemp >= ' + str(val)]
+
+        val = self.io.targetSpawnTemp + hysteresis
+        if (self.sensors.spawnMedian >= val):
+            self.dontHeatReasons += ['self.sensors.spawnMedian >= ' + str(val)]
+
+        val = self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis
+        if (self.sensors.spawnMax >= val):
+            self.dontHeatReasons += ['self.sensors.spawnMax >=' + str(val)]
+
+        val = self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis
+        if (self.sensors.fruitMax >= val):
+            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
+
+        # idiot checks
+        val = self.io.targetFruitTemp + 1 + hysteresis
+        if (self.sensors.fruitMax >= val):
+            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
+
+        val = self.io.targetSpawnTemp + 2 + hysteresis
+        if (self.sensors.maxTemp >= val):
+            self.dontHeatReasons += ['self.sensors.maxTemp >= ' + str(val)]
 
         return len(self.dontHeatReasons) == 0
 
@@ -224,7 +240,7 @@ class Control:
     
     def detectPeaks(self):
         index = 3
-        for i, temp in enumerate(self.sensors.detectors):
+        while index < len(self.sensors.detectors):
             detector = self.sensors.detectors[index]
             direction = detector.detect()
 
@@ -232,7 +248,7 @@ class Control:
                 elapsed = int(time.time()) - self.heatingPeriodStartTs
                 if elapsed < self.io.heatingPeriod / 2:
                     elapsed += self.io.heatingPeriod
-                    
+
                 self.io.peakDetected(
                     direction,
                     index,
@@ -240,14 +256,33 @@ class Control:
                     elapsed
                 )
             
-            ++ index
+            index += 1
+
+    def watchDog(self):
+        nowTs = int(time.time())
+
+        self.writeIncubateTs(0)
+        
+        watchdog = open('watchdog.ts', 'r')
+        watchdogTs = int(watchdog.read())
+
+        if watchdogTs < nowTs - 10: # how many seconds is allowed?
+            raise Exception('Watchdog timed out')
+        
+    def writeIncubateTs(self, delay = 0):
+        incubate = open('incubate.ts', 'w')
+        incubate.write(str(int(time.time()) + delay))
+        incubate.close()
+
 
     def run(self):
         try:
+            self.watchDog()
             self.read()
-            self.displayTemps('^c')
+            self.displayAction('^c')
             while True:
                 if ((int(str(int(time.time()))[-1]) >= 5)):
+                    self.watchDog()
                     self.read()
                     self.action()
                 time.sleep(0.1)
@@ -256,7 +291,9 @@ class Control:
             self.allOff()
             self.lightOn()
             self.io.output('allOff, KeyboardInterrupt')
+            self.writeIncubateTs(600)
             self.io.userOptions()
+
         except Exception as e:
             self.allOff()
             self.io.output('allOff')
