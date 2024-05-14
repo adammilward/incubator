@@ -13,9 +13,9 @@ class UserIO:
         self.targetSpawnTemp = 25
         self.maxTemp = 27
 
-        self.heaterOnPercent = 4
-        self.displayTempsTime = 600
+        self.heaterOnPercent = 0.5
         self.heatingPeriod = 10 * 60
+        self.displayTempsTime = self.heatingPeriod
 
         self.spawnHysteresis = 0
         self.spawnMaxOffset = 0.8
@@ -76,7 +76,7 @@ class UserIO:
 
     def displayTemps(
             self,
-            heatingRequired,
+            dontHeatReasons,
             heaterIsOn,
             fanIsOn,
             lightIsOn,
@@ -85,6 +85,7 @@ class UserIO:
             heaterCycleCount: str,
             message: str = ''
         ):
+        isHeatingRequired = len(dontHeatReasons) == 0
 
         while len(message) < 4 :
             message = ' ' + message
@@ -93,15 +94,15 @@ class UserIO:
         while len(heaterCycleCount) < 2 :
             heaterCycleCount = ' ' + heaterCycleCount 
 
-        print(self.tempsColour(heatingRequired, heaterIsOn, fanIsOn), end = '')
+        print(self.tempsColour(isHeatingRequired, heaterIsOn, fanIsOn), end = '')
         print(
                 message 
                 + elapsedSeconds + ' | '
                 + heaterCycleCount + ' | '
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
-                + str(self.tempStatus(heatingRequired, heaterIsOn, fanIsOn)) + " | "
-                + str(round(self.heaterOnPercent, 1)) + '% ' 
-                + str(self.heaterOnPercent * self.heatingPeriod / 100) + 's | '
+                + str(self.tempStatus(isHeatingRequired, heaterIsOn, fanIsOn)) + " | "
+                + '{:.1f}'.format(self.heaterOnPercent, 1) + '% ' 
+                + '{:.1f}'.format(self.heaterOnPercent * self.heatingPeriod / 100) + 's | '
                 + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn)
                 + self.targets()
                 , end = ""
@@ -116,7 +117,8 @@ class UserIO:
         print(self.colourTemp(self.sensors.temps[5], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
         print(end = self.END)
         
-        print(" || T:", str(self.sensors.temps[6]) + ' RH: ' + '{:.1f}'.format(self.sensors.humidity), end = '')
+        print(" || T:", str(self.sensors.temps[6]) + ' RH: ' + '{:.1f}'.format(self.sensors.humidity), end = ' ')
+        print(dontHeatReasons, end='')
         print(self.END)
 
     def targets(self,):
@@ -187,20 +189,21 @@ class UserIO:
             return self.CYAN2
         return self.GREEN
 
-    def peakDetected(self, direction, i, detector):
+    def peakDetected(self, direction, i, detector, elapsed):
         temps = []
         j = i
         while j:
             j -= 1
             print('   ', end='')
 
+        print ('                    ', end='')
         for record in detector.history:
             temps.append(record['temp'])
         if (direction > 0):
-            print (self.BLUE2 , '                    ', i, datetime.now().strftime("| %H:%M:%S"), '| falling, max was:', detector.recentMax, end=' ')
+            print (self.BLUE2, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| falling, max was:', detector.recentMax, end=' ')
             print(temps, self.END)
         elif (direction < 0):
-            print (self.RED2 ,  '                    ', i, datetime.now().strftime("| %H:%M:%S"), '| rising, min was:', detector.recentMin, end='')
+            print (self.RED2, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| rising, min was:', detector.recentMin, end='')
             print(temps, self.END)
 
 
@@ -299,7 +302,7 @@ class UserIO:
 
     def matchRequest(self, request):
         if request == "t":
-            self.displayTemps(self, False, False, False, False, 'user request')
+            self.displayTemps(self, [], False, False, False, 'user request')
             #self.speakTemps()
             return
         elif request == "s":

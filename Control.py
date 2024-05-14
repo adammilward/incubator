@@ -32,6 +32,7 @@ class Control:
         self.fanWasOn = False
         self.lightWasOn = False
         self.heatingWasRequired = False
+        self.dontHeatReasons = []
 
         self.io = UserIO.UserIO(self.sensors)
 
@@ -47,6 +48,11 @@ class Control:
         self.fanAction()
         self.lightAction()   
         self.displayAction('a')
+        if (self.heater.is_lit 
+            and self.sensors.maxTemp > self.io.targetSpawnTemp + self.io.spawnMaxOffset + 1):
+            self.displayTemps('E')
+            Exception('Heater should not be on max temp is' + str(self.sensors.maxTemp))
+
 
     def heatAction(self):
         if self.isHeatingRequired():
@@ -82,8 +88,6 @@ class Control:
         else :
             self.heaterOff()
 
-        self.displayAction('d')
-
     def heaterInactive(self):
         if (self.heaterCycleCount != -1):
             elapsedSeconds = int(time.time()) - self.heatingPeriodStartTs
@@ -106,14 +110,22 @@ class Control:
 
 
     def isHeatingRequired(self):
+        self.dontHeatReasons = []
         hysteresis = int(self.heatingWasRequired) * self.io.spawnHysteresis
-        return (self.sensors.maxTemp < self.io.maxTemp
-                and self.sensors.spawnMedian < self.io.targetSpawnTemp + hysteresis
-                and self.sensors.spawnMax < self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis
-                # incase somehing went wrong and he fruit is geing too hot
-                and self.sensors.fruitMax < self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis
-                #and self.sensors.fruitMedian < self.io.targetFruitTemp  + hysteresis
-                )
+        if (self.sensors.maxTemp >= self.io.maxTemp):
+            self.dontHeatReasons += ['sensors.maxTemp >= io.maxTemp ' + str(self.io.maxTemp)]
+        if (self.sensors.spawnMedian >= self.io.targetSpawnTemp + hysteresis):
+            self.dontHeatReasons += ['self.sensors.spawnMedian >= ' + str(self.io.targetSpawnTemp + hysteresis)]
+        if (self.sensors.spawnMax >= self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis):
+            self.dontHeatReasons += ['self.sensors.spawnMax >=' + str(self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis)]
+        if (self.sensors.fruitMax >= self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis):
+            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis)]
+        if (self.sensors.fruitMax >= self.io.targetFruitTemp + 2):
+            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(self.io.targetFruitTemp + 2)]
+        if (self.sensors.maxTemp >= self.io.targetSpawnTemp + 2):
+            self.dontHeatReasons += ['self.sensors.maxTemp >= ' + str(self.io.targetSpawnTemp + 2)]
+
+        return len(self.dontHeatReasons) == 0
 
     def isFanRequired(self):
         hysteresis = int(self.fanWasOn) * self.io.fruitHysteresis
@@ -165,7 +177,11 @@ class Control:
         self.heater.off()
     
     def heaterOn(self):
-        self.heater.on()
+        if self.sensors.maxTemp >= self.io.targetSpawnTemp + self.io.spawnMaxOffset + 1:
+            print('too hot!!! something has gone wrong')
+            self.heaterOff()
+        else:
+            self.heater.on()
 
     def fanOff(self):
         self.fan.off()
@@ -191,7 +207,7 @@ class Control:
 
     def displayTemps(self, message = ''):
         self.io.displayTemps(
-                self.isHeatingRequired(),
+                self.dontHeatReasons,
                 self.heater.is_lit,
                 self.fan.is_lit,
                 self.light.is_lit,
@@ -207,28 +223,24 @@ class Control:
         self.detectPeaks()
     
     def detectPeaks(self):
+        index = 3
         for i, temp in enumerate(self.sensors.detectors):
-            detector = self.sensors.detectors[i]
+            detector = self.sensors.detectors[index]
             direction = detector.detect()
 
             if (direction != 0):
-                self.io.peakDetected(direction, i, detector)
-
-    def displayDirectionChange(self):
-        monitoredTemp = self.sensors.temps[-1]
-        changed = monitoredTemp != self.lastMonitoredTemp
-        rising = monitoredTemp > self.lastMonitoredTemp
-
-        if (changed and self.wasRising != rising):
-            if rising:
-                message = '+ '
-            else:
-                message = '- '
+                elapsed = int(time.time()) - self.heatingPeriodStartTs
+                if elapsed < self.io.heatingPeriod / 2:
+                    elapsed += self.io.heatingPeriod
+                    
+                self.io.peakDetected(
+                    direction,
+                    index,
+                    detector, 
+                    elapsed
+                )
             
-            self.displayTemps(message + str(self.lastMonitoredTemp) + ' ' + str(monitoredTemp) + ' ')
-            self.wasRising = rising
-            
-        self.lastMonitoredTemp = monitoredTemp
+            ++ index
 
     def run(self):
         try:

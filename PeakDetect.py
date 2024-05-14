@@ -7,18 +7,19 @@ class PeakDetect:
         self.direction = 0
         self.oldDirection = 0
 
+        self.sampleCount = 5
         self.recentMax = -10000
         self.recentMin = 100000
 
     def addValue(self, ts, temp):
         value = {'ts': int(ts), 'temp': temp}
-        if len(self.history) < 3:
+        if len(self.history) < self.sampleCount:
             self.history.append(value)
         else:
             self.history = self.history[1:] + [value]
 
     def detect(self):
-        if len(self.history) < 3:
+        if len(self.history) < self.sampleCount:
             return False
         
         self.oldDirection = self.direction
