@@ -90,6 +90,10 @@ class UserIO:
         if not isHeatingRequired and heaterIsOn:
             print(dontHeatReasons, heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn, elapsedSeconds, heaterCycleCount, message)
             raise Exception('Heater should not be on!!!')
+        
+        if max(self.sensors.temps) > 29:
+            print(dontHeatReasons, heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn, elapsedSeconds, heaterCycleCount, message)
+            raise Exception('Heat has exceeded 29C!!!')
 
         while len(message) < 4 :
             message = ' ' + message

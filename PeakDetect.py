@@ -38,14 +38,14 @@ class PeakDetect:
 
         #print('max: ', self.recentMax, '    min: ', self.recentMin)
 
-        if max(new) < self.recentMax and self.direction > -1:
+        if max(new) < self.recentMax and self.direction > 1:
             self.recentMin = max(new)
-            self.direction = -1
+            self.direction = 1
             
         
-        if min(new) > self.recentMin and self.direction < 1:
+        if min(new) > self.recentMin and self.direction < -1:
             self.recentMax = min(new)
-            self.direction = 1
+            self.direction = -1
 
         return self.oldDirection - self.direction
 

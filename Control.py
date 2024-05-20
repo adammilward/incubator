@@ -53,7 +53,7 @@ class Control:
         self.displayAction('a')
         if (self.heater.is_lit 
             and self.sensors.maxTemp > self.io.targetSpawnTemp + self.io.spawnMaxOffset + 1):
-            self.displayTemps('E')
+            self.displayTemps('Err')
             raise Exception('Heater should not be on max temp is' + str(self.sensors.maxTemp))
 
 
@@ -244,7 +244,7 @@ class Control:
             detector = self.sensors.detectors[index]
             direction = detector.detect()
 
-            if (direction != 0):
+            if (direction < 0):
                 elapsed = int(time.time()) - self.heatingPeriodStartTs
                 if elapsed < self.io.heatingPeriod / 2:
                     elapsed += self.io.heatingPeriod
@@ -279,7 +279,7 @@ class Control:
         try:
             self.watchDog()
             self.read()
-            self.displayAction('^c')
+            self.displayAction('start')
             while True:
                 if ((int(str(int(time.time()))[-1]) >= 5)):
                     self.watchDog()
@@ -289,13 +289,14 @@ class Control:
                 
         except KeyboardInterrupt:
             self.allOff()
+            self.writeIncubateTs(600)
             self.lightOn()
             self.io.output('allOff, KeyboardInterrupt')
-            self.writeIncubateTs(600)
             self.io.userOptions()
 
         except Exception as e:
             self.allOff()
+            self.writeIncubateTs(30)
             self.io.output('allOff')
             self.io.output("FAILURE!")
             self.io.output(str(e))

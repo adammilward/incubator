@@ -55,7 +55,8 @@ class SensorRead:
         for i, folder in enumerate(self.deviceFolders):
             deviceFile = folder + '/w1_slave'
             self.temps[i] = round((self.read_temp(i) + self.offsets[i]), 1)
-            htTemps.append(self.htSensor.temperature)
+            if (i % 2 == 0):
+                htTemps.append(self.htSensor.temperature)
 
         lastSensorIndex = len(self.deviceFolders)
         self.temps[lastSensorIndex] = round((statistics.median(htTemps) + self.offsets[lastSensorIndex]), 1)
