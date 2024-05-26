@@ -5,11 +5,11 @@ import subprocess
 def readWriteTs(attempts = 5):
         nowTs = int(time.time())
 
-        watchdog = open('watchdog.ts', 'w')
+        watchdog = open('/home/adam/python/watchdog.ts', 'w')
         watchdog.write(str(nowTs))
         watchdog.close()
 
-        incubate = open('incubate.ts', 'r')
+        incubate = open('/home/adam/python/incubate.ts', 'r')
         incubateTs = int(incubate.read())
         print(incubateTs)
 
@@ -31,15 +31,19 @@ def killAll():
     fan.off()
     light.off()
 
-    print(subprocess.run(["pkill", "-f", "incubate"]))
+    print(subprocess.run(["pkill", "-f", "incubate.py"]))
     print('killed all')
 
-while True:
-    time.sleep(5)
+def run():
+     while True:
+        time.sleep(10)
 
-    try:
-        readWriteTs(1)
-    except Exception as e:
-         print(e)
-         killAll()
-         raise Exception(e)
+        try:
+            readWriteTs(1)
+        except Exception as e:
+            print(e)
+            killAll()
+            run()
+     
+
+run()

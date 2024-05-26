@@ -4,8 +4,8 @@ class PeakDetect:
     def __init__(self) -> None:
         self.history = []
 
-        self.direction = 0
-        self.oldDirection = 0
+        self.direction = -1
+        self.oldDirection = 1
 
         self.sampleCount = 5
         self.recentMax = -10000
@@ -15,6 +15,9 @@ class PeakDetect:
         value = {'ts': int(ts), 'temp': temp}
         if len(self.history) < self.sampleCount:
             self.history.append(value)
+            values = self.getValues()
+            self.recentMin = max(values)
+            self.recentMax = min(values)
         else:
             self.history = self.history[1:] + [value]
 
@@ -24,30 +27,35 @@ class PeakDetect:
         
         self.oldDirection = self.direction
 
-        new = []
-
-        for value in self.history:
-            new.append(value['temp'])
+        values = self.getValues()
 
         #print()
-        #print('old', old)
         #print('new', new)
 
-        self.recentMax = max(self.recentMax, min(new))
-        self.recentMin = min(self.recentMin, max(new))
+        self.recentMax = max(self.recentMax, min(values))
+        self.recentMin = min(self.recentMin, max(values))
 
         #print('max: ', self.recentMax, '    min: ', self.recentMin)
 
-        if max(new) < self.recentMax and self.direction > 1:
-            self.recentMin = max(new)
-            self.direction = 1
+        if max(values) < self.recentMax and self.direction != -1:
+            #falling
+            self.recentMin = max(values)
+            self.direction = -1
             
         
-        if min(new) > self.recentMin and self.direction < -1:
-            self.recentMax = min(new)
-            self.direction = -1
+        if min(values) > self.recentMin and self.direction != 1:
+            #rising
+            self.recentMax = min(values)
+            self.direction = 1
 
-        return self.oldDirection - self.direction
+        return int((self.direction - self.oldDirection) * 0.5)
+
+    def getValues(self):
+        values = []
+
+        for value in self.history:
+            values.append(value['temp'])
+        return values
 
     def getValue(self):
         val = input('give me a value: ')

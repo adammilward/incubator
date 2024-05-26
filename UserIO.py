@@ -2,16 +2,19 @@ import time
 from espeak import espeak
 from datetime import datetime
 import SensorRead
+import Camera
 
 class UserIO:
-    def __init__(self, sensors: SensorRead) -> None:
+    def __init__(self, sensors: SensorRead, camera: Camera) -> None:
         self.sensors: SensorRead = sensors
+        self.camera: Camera = camera
 
         # 25/26 for spawn, 21 air temp for fruiting, 23 (max 24) for substrate
 
         self.targetFruitTemp = 21.5
-        self.targetSpawnTemp = 25
-        self.maxTemp = 27
+        self.targetSpawnTemp = 25.5
+        self.maxTemp = 28
+        self.idiotCheckTemp = 30
 
         self.heaterOnPercent = 3
         self.heatingPeriod = 10 * 60
@@ -22,7 +25,7 @@ class UserIO:
         self.fruitHysteresis = 0.2
         self.fruitMaxOffset = 0.5
 
-        self.lightsActive = False
+        self.lightsActive = True
 
         self.END      = '\33[0m'
         self.BOLD     = '\33[1m'
@@ -91,9 +94,9 @@ class UserIO:
             print(dontHeatReasons, heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn, elapsedSeconds, heaterCycleCount, message)
             raise Exception('Heater should not be on!!!')
         
-        if max(self.sensors.temps) > 29:
+        if max(self.sensors.temps) > self.idiotCheckTemp:
             print(dontHeatReasons, heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn, elapsedSeconds, heaterCycleCount, message)
-            raise Exception('Heat has exceeded 29C!!!')
+            raise Exception('Heat has exceeded ' + str(self.idiotCheckTemp) + 'C!!!')
 
         while len(message) < 4 :
             message = ' ' + message
@@ -198,6 +201,7 @@ class UserIO:
         return self.GREEN
 
     def peakDetected(self, direction, i, detector, elapsed):
+
         temps = []
         j = i
         while j:
@@ -207,11 +211,11 @@ class UserIO:
         print ('                    ', end='')
         for record in detector.history:
             temps.append(record['temp'])
-        if (direction > 0):
-            print (self.BLUE2, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| falling, max was:', detector.recentMax, end=' ')
+        if (direction < 0):
+            print (self.ITALIC, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| falling, max was:', detector.recentMax, end=' ')
             print(temps, self.END)
-        elif (direction < 0):
-            print (self.RED2, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| rising, min was:', detector.recentMin, end='')
+        elif (direction > 0):
+            print (self.ITALIC, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| rising, min was:', detector.recentMin, end='')
             print(temps, self.END)
 
 
@@ -305,8 +309,11 @@ class UserIO:
 
     def userOptions(self):
         self.output("What do you want?")
-        request = self.input("T for temperatures, S for settings, C for calibrate").lower()
+        request = self.input("T for temperatures; S for settings; C for Capture; Ca for calibrate").lower()
         return self.matchRequest(request)
+    
+    def capture(self):
+        self.camera.capture()
 
     def matchRequest(self, request):
         if request == "t":
@@ -316,7 +323,10 @@ class UserIO:
         elif request == "s":
             return self.userInputs()
         elif request == "c":
-            return self.calibrate()
+            return self.capture()
+        elif request == "ca":
+            #return self.calibrate() #uncomment to calibrate
+            return
         else:
             return self.output("Command not recognised")
 

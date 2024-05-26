@@ -14,15 +14,15 @@ class Controll:
             self.getValue()
 
         direction = self.detector.detect()
+        print(direction)
 
-        if (direction > 0):
+        if (direction < 0):
             print ('falling, max was: ', self.detector.recentMax)
             print(self.detector.history)
-        elif (direction < 0):
+        elif (direction > 0):
             print ('rising, min was: ', self.detector.recentMin)
             print(self.detector.history)
         
-            
         self.getValue()
 
 

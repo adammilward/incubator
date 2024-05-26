@@ -9,7 +9,6 @@
 #      3.3  24
 # led   10  G
 
-
 import Control
 
 control = Control.Control();

@@ -5,6 +5,7 @@ import UserIO
 from gpiozero import LED
 from datetime import datetime
 import math
+import Camera
 
 class Control:
     def __init__(self):
@@ -25,6 +26,9 @@ class Control:
         self.fanHysteresis = 0
         self.fanHysteresis = 0
 
+        self.camera = Camera.Camera()
+        self.lastCaptureHour = 99
+
         self.sensors = SensorRead.SensorRead()
         self.lastMonitoredTemp = self.sensors.meanTemp
         self.rising = False
@@ -37,7 +41,7 @@ class Control:
         self.heatingWasRequired = False
         self.dontHeatReasons = []
 
-        self.io = UserIO.UserIO(self.sensors)
+        self.io = UserIO.UserIO(self.sensors, self.camera)
 
         self.lastDisplayTs = int(time.time()) - self.io.displayTempsTime
 
@@ -49,13 +53,12 @@ class Control:
     def action(self):
         self.heatAction()
         self.fanAction()
-        self.lightAction()   
+        self.lightAction()
         self.displayAction('a')
         if (self.heater.is_lit 
             and self.sensors.maxTemp > self.io.targetSpawnTemp + self.io.spawnMaxOffset + 1):
             self.displayTemps('Err')
             raise Exception('Heater should not be on max temp is' + str(self.sensors.maxTemp))
-
 
     def heatAction(self):
         if self.isHeatingRequired():
@@ -73,7 +76,7 @@ class Control:
 
             if (self.heaterCycleCount >= 2 
                 and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.1):
-                self.io.heaterOnPercent += 0.5
+                self.io.heaterOnPercent *= 1.25
 
             if heaterOnSeconds > 200:
                 raise Exception("heaterOnSeconds out of range: " + str(heaterOnSeconds))
@@ -128,7 +131,7 @@ class Control:
         if (self.sensors.spawnMax >= val):
             self.dontHeatReasons += ['self.sensors.spawnMax >=' + str(val)]
 
-        val = self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis
+        val = self.io.targetFruitTemp + self.io.fruitMaxOffset + 0.3 + hysteresis
         if (self.sensors.fruitMax >= val):
             self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
 
@@ -137,7 +140,7 @@ class Control:
         if (self.sensors.fruitMax >= val):
             self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
 
-        val = self.io.targetSpawnTemp + 2 + hysteresis
+        val = self.io.idiotCheckTemp - 1
         if (self.sensors.maxTemp >= val):
             self.dontHeatReasons += ['self.sensors.maxTemp >= ' + str(val)]
 
@@ -160,10 +163,26 @@ class Control:
             return
         
         hour = int(datetime.now().strftime("%H"))
-        if (hour >= 7 and hour < 19):
+
+    
+        if (hour >= 10 and hour < 18):
             self.lightOn()
+            lightsOn = True
         else:
-            self.lightOff()        
+            self.lightOff()
+            lightsOn = False    
+
+        if (hour != self.lastCaptureHour):
+            self.capture(lightsOn)
+
+    def capture(self, lightsOn = False):
+        hour = int(datetime.now().strftime("%H"))
+        self.lightOn()
+        self.lastCaptureHour = hour
+        self.camera.capture(str(hour))
+
+        if (not lightsOn):
+            self.lightOff()
 
     def displayAction(self, message = ''):
         if (
@@ -263,45 +282,44 @@ class Control:
 
         self.writeIncubateTs(0)
         
-        watchdog = open('watchdog.ts', 'r')
+        watchdog = open('/home/adam/python/watchdog.ts', 'r')
         watchdogTs = int(watchdog.read())
 
         if watchdogTs < nowTs - 10: # how many seconds is allowed?
             raise Exception('Watchdog timed out')
         
     def writeIncubateTs(self, delay = 0):
-        incubate = open('incubate.ts', 'w')
+        incubate = open('/home/adam/python/incubate.ts', 'w')
         incubate.write(str(int(time.time()) + delay))
         incubate.close()
 
 
     def run(self):
-        try:
-            self.watchDog()
-            self.read()
-            self.displayAction('start')
-            while True:
-                if ((int(str(int(time.time()))[-1]) >= 5)):
-                    self.watchDog()
-                    self.read()
-                    self.action()
-                time.sleep(0.1)
-                
-        except KeyboardInterrupt:
-            self.allOff()
-            self.writeIncubateTs(600)
-            self.lightOn()
-            self.io.output('allOff, KeyboardInterrupt')
-            self.io.userOptions()
+        while True:
+            try:
+                self.watchDog()
+                self.read()
+                self.displayAction('start')
+                while True:
+                    if ((int(str(int(time.time()))[-1]) >= 5)):
+                        self.watchDog()
+                        self.read()
+                        self.action()
+                    time.sleep(0.1)
+                    
+            except KeyboardInterrupt:
+                self.allOff()
+                self.writeIncubateTs(600)
+                self.lightOn()
+                self.io.output('allOff, KeyboardInterrupt')
+                self.io.userOptions()
+                self.lastCaptureHour = 100
 
-        except Exception as e:
-            self.allOff()
-            self.writeIncubateTs(30)
-            self.io.output('allOff')
-            self.io.output("FAILURE!")
-            self.io.output(str(e))
-            self.io.soundAllarm()
-            self.sensors = SensorRead.SensorRead()
-
-        self.run()
+            except Exception as e:
+                self.allOff()
+                self.writeIncubateTs(30)
+                self.io.output('allOff')
+                self.io.output("FAILURE!")
+                self.io.output(str(e))
+                self.io.soundAllarm()
             
