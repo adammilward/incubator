@@ -2,6 +2,7 @@
 import time
 import SensorRead
 import UserIO
+import traceback
 from gpiozero import LED
 from datetime import datetime
 import math
@@ -28,6 +29,9 @@ class Control:
 
         self.camera = Camera.Camera()
         self.lastCaptureHour = 99
+
+        self.sunrise = 10
+        self.sunset = 18
 
         self.sensors = SensorRead.SensorRead()
         self.lastMonitoredTemp = self.sensors.meanTemp
@@ -74,11 +78,11 @@ class Control:
             self.heaterCycleCount += 1
             self.heatingPeriodStartTs = int(time.time())
 
-            if (self.heaterCycleCount >= 2 
+            if (self.heaterCycleCount >= 5
                 and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.1):
-                self.io.heaterOnPercent *= 1.25
+                self.io.heaterOnPercent *= 1.1
 
-            if heaterOnSeconds > 200:
+            if heaterOnSeconds > 200 or self.io.heaterOnPercent > 100:
                 raise Exception("heaterOnSeconds out of range: " + str(heaterOnSeconds))
  
         heatingTimeLeft = self.heatingPeriodStartTs + heaterOnSeconds - now
@@ -95,15 +99,17 @@ class Control:
             self.heaterOff()
 
     def heaterInactive(self):
+        self.heaterOff()
+
         if (self.heaterCycleCount != -1):
             elapsedSeconds = int(time.time()) - self.heatingPeriodStartTs
             modifier = (elapsedSeconds) / self.io.heatingPeriod
             
-            if(self.heaterCycleCount == 0):
+            if(self.heaterCycleCount <= 2):
                 modifier = math.sqrt(modifier)
                 modifier = modifier / 2 + 0.5
                 self.io.heaterOnPercent = self.io.heaterOnPercent * modifier
-            elif(self.heaterCycleCount == 1):
+            elif(self.heaterCycleCount <= 5):
                 modifier = math.sqrt(math.sqrt(modifier))
                 modifier = modifier / 2 + 0.5
                 self.io.heaterOnPercent = self.io.heaterOnPercent * modifier
@@ -141,8 +147,8 @@ class Control:
             self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
 
         val = self.io.idiotCheckTemp - 1
-        if (self.sensors.maxTemp >= val):
-            self.dontHeatReasons += ['self.sensors.maxTemp >= ' + str(val)]
+        if (self.sensors.medianTemp >= val):
+            self.dontHeatReasons += ['self.sensors.medianTemp >= ' + str(val)]
 
         return len(self.dontHeatReasons) == 0
 
@@ -165,7 +171,7 @@ class Control:
         hour = int(datetime.now().strftime("%H"))
 
     
-        if (hour >= 10 and hour < 18):
+        if (hour >= self.sunrise and hour < self.sunset):
             self.lightOn()
             lightsOn = True
         else:
@@ -213,8 +219,9 @@ class Control:
     
     def heaterOn(self):
         if self.sensors.maxTemp >= self.io.targetSpawnTemp + self.io.spawnMaxOffset + 1:
-            print('too hot!!! something has gone wrong')
             self.heaterOff()
+            print('too hot!!! something has gone wrong max:', self.sensors.maxTemp)
+            self.displayTemps('too hot')
         else:
             self.heater.on()
 
@@ -284,8 +291,9 @@ class Control:
         
         watchdog = open('/home/adam/python/watchdog.ts', 'r')
         watchdogTs = int(watchdog.read())
+        watchdog.close()
 
-        if watchdogTs < nowTs - 10: # how many seconds is allowed?
+        if watchdogTs < nowTs - 20: # how many seconds is allowed?
             raise Exception('Watchdog timed out')
         
     def writeIncubateTs(self, delay = 0):
@@ -299,6 +307,7 @@ class Control:
             try:
                 self.watchDog()
                 self.read()
+                self.action()
                 self.displayAction('start')
                 while True:
                     if ((int(str(int(time.time()))[-1]) >= 5)):
@@ -321,5 +330,6 @@ class Control:
                 self.io.output('allOff')
                 self.io.output("FAILURE!")
                 self.io.output(str(e))
+                traceback.print_exc()
                 self.io.soundAllarm()
             

@@ -69,7 +69,7 @@ class SensorRead:
         self.fruitMax = max(self.temps[0:3])
         self.spawnMedian = statistics.median(self.temps[3:6])
         self.spawnMax = max(self.temps[3:6])
-        self.minTemp = min(self.temps)
+        self.minTemp = min(self.temps) 
         self.maxTemp = max(self.temps)
 
     def read_temp_raw(self, deviceFile):

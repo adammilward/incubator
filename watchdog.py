@@ -1,6 +1,14 @@
 import time
+from datetime import datetime
 from gpiozero import LED
 import subprocess
+import traceback
+
+heater = LED(17)
+dcPow = LED(27)
+fan = LED(22)
+light = LED(10)
+maxDelay = 0;
 
 def readWriteTs(attempts = 5):
         nowTs = int(time.time())
@@ -11,28 +19,48 @@ def readWriteTs(attempts = 5):
 
         incubate = open('/home/adam/python/incubate.ts', 'r')
         incubateTs = int(incubate.read())
-        print(incubateTs)
+        incubate.close()
+        
+        incubateDt = datetime.fromtimestamp(incubateTs).strftime('%H:%M:%S')
+        nowDt = datetime.fromtimestamp(nowTs).strftime('%H:%M:%S')
+        
+        delay = incubateTs - nowTs
+        global maxDelay
+        maxDelay = min(delay, maxDelay)
 
-        if incubateTs < nowTs - 16: # how many seconds is allowed?
-            if (attempts >= 2):
+        f = '-'
+        h = '-'
+        l = '-'
+        d= '-'
+        if fan.is_lit:
+            f = 'f'
+        if heater.is_lit:
+            h = 'h'
+        if light.is_lit:
+            l = 'l'
+        if dcPow.is_lit:
+            d = 'd'
+
+        onns = h + f + l + d
+        
+        if delay - 21: # how many seconds is allowed?
+            if (attempts >= 3):
+                 print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
                  killAll()
             else:
-                print('attempts = ', attempts)
+                print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
                 time.sleep(5)
                 readWriteTs(2)
+        else:
+            print(incubateDt, onns, nowDt, delay, maxDelay)
 
 def killAll():
-    heater = LED(17)
-    dcPow = LED(27)
-    fan = LED(22)
-    light = LED(10)
     heater.off()
     dcPow.off()
     fan.off()
     light.off()
-
-    print(subprocess.run(["pkill", "-f", "incubate.py"]))
-    print('killed all')
+    
+    print(subprocess.run(["pkill", "-f", "incubate.py"]), datetime.now().strftime("%Y/%m/%d %H:%M:%S"), end = ' | ')
 
 def run():
      while True:
@@ -43,6 +71,7 @@ def run():
         except Exception as e:
             print(e)
             killAll()
+            traceback.print_exc()
             run()
      
 
