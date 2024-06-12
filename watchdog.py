@@ -42,17 +42,18 @@ def readWriteTs(attempts = 5):
             d = 'd'
 
         onns = h + f + l + d
-        
-        if delay - 21: # how many seconds is allowed?
+
+        if delay < -21: # how many seconds is allowed?
             if (attempts >= 3):
                  print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
                  killAll()
             else:
                 print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
                 time.sleep(5)
-                readWriteTs(2)
+                readWriteTs(attempts + 1)
         else:
-            print(incubateDt, onns, nowDt, delay, maxDelay)
+            attempts = 0
+            #print(incubateDt, onns, nowDt, delay, maxDelay)
 
 def killAll():
     heater.off()
@@ -67,7 +68,7 @@ def run():
         time.sleep(10)
 
         try:
-            readWriteTs(1)
+            readWriteTs(0)
         except Exception as e:
             print(e)
             killAll()

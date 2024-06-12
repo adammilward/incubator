@@ -308,7 +308,6 @@ class Control:
                 self.watchDog()
                 self.read()
                 self.action()
-                self.displayAction('start')
                 while True:
                     if ((int(str(int(time.time()))[-1]) >= 5)):
                         self.watchDog()
@@ -318,18 +317,20 @@ class Control:
                     
             except KeyboardInterrupt:
                 self.allOff()
-                self.writeIncubateTs(600)
                 self.lightOn()
                 self.io.output('allOff, KeyboardInterrupt')
                 self.io.userOptions()
                 self.lastCaptureHour = 100
+                self.writeIncubateTs(60)
 
             except Exception as e:
                 self.allOff()
-                self.writeIncubateTs(30)
                 self.io.output('allOff')
                 self.io.output("FAILURE!")
                 self.io.output(str(e))
                 traceback.print_exc()
                 self.io.soundAllarm()
+                self.writeIncubateTs(30)
+            
+            self.displayTemps('restart')
             
