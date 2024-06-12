@@ -60,9 +60,9 @@ class Control:
         self.lightAction()
         self.displayAction('a')
         if (self.heater.is_lit 
-            and self.sensors.maxTemp > self.io.targetSpawnTemp + self.io.spawnMaxOffset + 1):
+            and self.sensors.medianTemp > self.io.idiotCheckMedTemp):
             self.displayTemps('Err')
-            raise Exception('Heater should not be on max temp is' + str(self.sensors.maxTemp))
+            raise Exception('Heater should not be on median temp is' + str(self.sensors.medianTemp))
 
     def heatAction(self):
         if self.isHeatingRequired():
@@ -146,7 +146,7 @@ class Control:
         if (self.sensors.fruitMax >= val):
             self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
 
-        val = self.io.idiotCheckTemp - 1
+        val = self.io.idiotCheckMedTemp - 1
         if (self.sensors.medianTemp >= val):
             self.dontHeatReasons += ['self.sensors.medianTemp >= ' + str(val)]
 
@@ -158,7 +158,7 @@ class Control:
                 and self.sensors.fruitMax < self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis)
 
     def fanAction(self):
-        if self.isFanRequired():
+        if self.isFanRequired() and self.io.fanActive:
             self.fanOn()
         else:
             self.fanOff()
@@ -218,7 +218,7 @@ class Control:
         self.heater.off()
     
     def heaterOn(self):
-        if self.sensors.maxTemp >= self.io.targetSpawnTemp + self.io.spawnMaxOffset + 1:
+        if self.sensors.medianTemp >= self.io.idiotCheckMedTemp:
             self.heaterOff()
             print('too hot!!! something has gone wrong max:', self.sensors.maxTemp)
             self.displayTemps('too hot')
