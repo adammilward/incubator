@@ -8,15 +8,20 @@ class Camera:
         self.camera = PiCamera()
 
     def capture(self, hour = ''):
-        self.camera.annotate_text = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        self.camera.start_preview()
-        sleep(5)
-        fileName = '/home/adam/Desktop/fruit'
-        self.camera.capture(fileName + '.jpg')
-        
-        if (hour):
-            fileName += '-' + hour
+        try:
+            self.camera.annotate_text = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+            self.camera.start_preview()
+            sleep(5)
+            fileName = '/home/adam/Desktop/fruit'
             self.camera.capture(fileName + '.jpg')
+            
+            if (hour):
+                fileName += '-' + hour
+                self.camera.capture(fileName + '.jpg')
 
+            self.camera.stop_preview()
+            self.camera.close()
 
-        self.camera.stop_preview()
+        except:
+            print('camera failed')
+            self.camera.close()

@@ -16,7 +16,7 @@ class UserIO:
         self.maxTemp = 32
         self.idiotCheckMedTemp = 28
 
-        self.heaterOnPercent = 20
+        self.heaterOnPercent = 5
         self.heatingPeriod = 200
         self.displayTempsTime = 600
 
