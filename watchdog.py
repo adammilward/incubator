@@ -8,7 +8,8 @@ heater = LED(17)
 dcPow = LED(27)
 fan = LED(22)
 light = LED(10)
-maxDelay = 0;
+maxDelay = 0
+doPrint = True
 
 def readWriteTs(attempts = 5):
         nowTs = int(time.time())
@@ -28,6 +29,8 @@ def readWriteTs(attempts = 5):
         global maxDelay
         maxDelay = min(delay, maxDelay)
 
+        global doPrint
+
         f = '-'
         h = '-'
         l = '-'
@@ -45,32 +48,50 @@ def readWriteTs(attempts = 5):
 
         if delay < -21: # how many seconds is allowed?
             if (attempts >= 3):
-                 print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
-                 killAll()
+                if doPrint: output(incubateDt, onns, nowDt, delay, maxDelay, attempts)
+                killAll()
+                doPrint = False
             else:
-                print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
+                if doPrint: output(incubateDt, onns, nowDt, delay, maxDelay, attempts)
                 time.sleep(5)
                 readWriteTs(attempts + 1)
         else:
             attempts = 0
-            #print(incubateDt, onns, nowDt, delay, maxDelay)
+            doPrint = True
+            #output(incubateDt, onns, nowDt, delay, maxDelay)
 
 def killAll():
     heater.off()
     dcPow.off()
     fan.off()
     light.off()
+    global doPrint
     
-    print(subprocess.run(["pkill", "-f", "incubate.py"]), datetime.now().strftime("%Y/%m/%d %H:%M:%S"), end = ' | ')
+    if doPrint:
+        output(subprocess.run(["pkill", "-f", "incubate.py"]), datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+    else:
+        subprocess.run(["pkill", "-f", "incubate.py"]), datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+        #output(subprocess.Popen(["python3", "/home/adam/python/incubate.py", '&']))
+
+def output(*messages):
+    output = '';
+    for message in messages:
+        output += str(message) + ' '
+    print(output)
+    sout = open('/home/adam/python/watchdogOut.txt', 'a')
+    sout.write(output)
+    sout.close()
+
 
 def run():
+     output(datetime.now().strftime("%Y/%m/%d %H:%M:%S"), "---- START --\n")
      while True:
         time.sleep(10)
 
         try:
             readWriteTs(0)
         except Exception as e:
-            print(e)
+            output(e)
             killAll()
             traceback.print_exc()
             run()

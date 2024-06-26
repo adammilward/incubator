@@ -7,6 +7,7 @@ from gpiozero import LED
 from datetime import datetime
 import math
 import Camera
+import subprocess
 
 class Control:
     def __init__(self):
@@ -137,14 +138,11 @@ class Control:
         if (self.sensors.spawnMax >= val):
             self.dontHeatReasons += ['self.sensors.spawnMax >=' + str(val)]
 
-        val = self.io.targetFruitTemp + self.io.fruitMaxOffset + 0.3 + hysteresis
-        if (self.sensors.fruitMax >= val):
-            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
+        # val = self.io.targetFruitTemp + self.io.fruitMaxOffset + 0.3 + hysteresis
+        # if (self.sensors.fruitMax >= val):
+        #     self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
 
         # idiot checks
-        val = self.io.targetFruitTemp + 1 + hysteresis
-        if (self.sensors.fruitMax >= val):
-            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
 
         val = self.io.idiotCheckMedTemp - 1
         if (self.sensors.medianTemp >= val):
@@ -294,7 +292,9 @@ class Control:
         watchdog.close()
 
         if watchdogTs < nowTs - 20: # how many seconds is allowed?
-            raise Exception('Watchdog timed out')
+            print(subprocess.run(["pkill", "-f", "watchdog.py"]), datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+            subprocess.Popen(["python3", "/home/adam/python/watchdog.py", '&'])
+            #raise Exception('Watchdog timed out')
         
     def writeIncubateTs(self, delay = 0):
         incubate = open('/home/adam/python/incubate.ts', 'w')
@@ -321,7 +321,7 @@ class Control:
                 self.io.output('allOff, KeyboardInterrupt')
                 self.io.userOptions()
                 self.lastCaptureHour = 100
-                self.writeIncubateTs(60)
+                #self.writeIncubateTs(60)
 
             except Exception as e:
                 self.allOff()
