@@ -137,15 +137,12 @@ class Control:
         if (self.sensors.spawnMax >= val):
             self.dontHeatReasons += ['self.sensors.spawnMax >=' + str(val)]
 
-        val = self.io.targetFruitTemp + self.io.fruitMaxOffset + 0.3 + hysteresis
-        if (self.sensors.fruitMax >= val):
-            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
+        if self.io.fanActive:
+            val = self.io.targetFruitTemp + self.io.fruitMaxOffset + 0.3 + hysteresis
+            if (self.sensors.fruitMax >= val):
+                self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
 
         # idiot checks
-        val = self.io.targetFruitTemp + 1 + hysteresis
-        if (self.sensors.fruitMax >= val):
-            self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
-
         val = self.io.idiotCheckMedTemp - 1
         if (self.sensors.medianTemp >= val):
             self.dontHeatReasons += ['self.sensors.medianTemp >= ' + str(val)]

@@ -267,8 +267,11 @@ class UserIO:
         heaterOnPercent = self.input("Enter heater on percent, default is " + str(self.heaterOnPercent) + ": ")
         if not heaterOnPercent: heaterOnPercent = self.heaterOnPercent
 
-        displayTempsTime = self.input("Display temps time, default is " + str(self.displayTempsTime) + ": ")
-        if not displayTempsTime: displayTempsTime = self.displayTempsTime
+        lightsActive = self.input("Activate Lighting. Default is " + lightsDefault + ": ")
+        if not lightsActive: lightsActive = str(int(self.lightsActive))
+
+        fanActive = self.input("Activate fan. Default is " + fanDefault + ": ")
+        if not fanActive: fanActive = str(int(self.fanActive))
 
         targetFruitTemp = self.input("Enter fruit target temp. Default is " + str(self.targetFruitTemp) + ": ")
         if not targetFruitTemp: targetFruitTemp = self.targetFruitTemp
@@ -279,11 +282,8 @@ class UserIO:
         maxTemp = self.input("Enter overall max temp. Default is " + str(self.maxTemp) + ": ")
         if not maxTemp: maxTemp = self.maxTemp
 
-        lightsActive = self.input("Activate Lighting. Default is " + lightsDefault + ": ")
-        if not lightsActive: lightsActive = str(int(self.lightsActive))
-
-        fanActive = self.input("Activate fan. Default is " + fanDefault + ": ")
-        if not fanActive: fanActive = str(int(self.fanActive))
+        displayTempsTime = self.input("Display temps time, default is " + str(self.displayTempsTime) + ": ")
+        if not displayTempsTime: displayTempsTime = self.displayTempsTime
 
         self.targetFruitTemp = float(targetFruitTemp)
         self.targetSpawnTemp = float(targetSpawnTemp)

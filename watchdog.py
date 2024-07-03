@@ -44,7 +44,7 @@ def readWriteTs(attempts = 5):
         onns = h + f + l + d
 
         if delay < -21: # how many seconds is allowed?
-            if (attempts >= 3):
+            if (attempts >= 5):
                  print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
                  killAll()
             else:

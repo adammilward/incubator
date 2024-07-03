@@ -1,6 +1,7 @@
 from picamera import PiCamera
 from time import sleep
 from datetime import datetime
+import traceback
 
 
 class Camera:
@@ -20,8 +21,12 @@ class Camera:
                 self.camera.capture(fileName + '.jpg')
 
             self.camera.stop_preview()
-            self.camera.close()
 
-        except:
+            return False
+
+        except Exception as e:
             print('camera failed')
-            self.camera.close()
+            print(str(e))
+            traceback.print_exc()
+
+            return False
