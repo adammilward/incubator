@@ -22,7 +22,7 @@ class Camera:
 
             self.camera.stop_preview()
 
-            return False
+            return True
 
         except Exception as e:
             print('camera failed')

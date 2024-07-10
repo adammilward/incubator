@@ -8,7 +8,8 @@ heater = LED(17)
 dcPow = LED(27)
 fan = LED(22)
 light = LED(10)
-maxDelay = 0;
+maxDelay = 0
+doOutputting = True
 
 def readWriteTs(attempts = 5):
         nowTs = int(time.time())
@@ -22,11 +23,13 @@ def readWriteTs(attempts = 5):
         incubate.close()
         
         incubateDt = datetime.fromtimestamp(incubateTs).strftime('%H:%M:%S')
-        nowDt = datetime.fromtimestamp(nowTs).strftime('%H:%M:%S')
+        nowDt = datetime.fromtimestamp(nowTs).strftime('Y/%m/%d %H:%M:%S')
         
         delay = incubateTs - nowTs
         global maxDelay
         maxDelay = min(delay, maxDelay)
+
+        global doOutputting
 
         f = '-'
         h = '-'
@@ -45,15 +48,17 @@ def readWriteTs(attempts = 5):
 
         if delay < -21: # how many seconds is allowed?
             if (attempts >= 5):
-                 print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
+                 output(incubateDt, onns, nowDt, delay, maxDelay, attempts)
                  killAll()
+                 doOutputting = False
             else:
-                print(incubateDt, onns, nowDt, delay, maxDelay, attempts)
+                output(incubateDt, onns, nowDt, delay, maxDelay, attempts)
                 time.sleep(5)
                 readWriteTs(attempts + 1)
         else:
             attempts = 0
-            #print(incubateDt, onns, nowDt, delay, maxDelay)
+            doOutputting = True
+            #output(incubateDt, onns, nowDt, delay, maxDelay)
 
 def killAll():
     heater.off()
@@ -61,7 +66,12 @@ def killAll():
     fan.off()
     light.off()
     
-    print(subprocess.run(["pkill", "-f", "incubate.py"]), datetime.now().strftime("%Y/%m/%d %H:%M:%S"), end = ' | ')
+    output(subprocess.run(["pkill", "-f", "incubate.py"]), datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+
+def output(*args, end = '\n'):
+    global doOutputting
+    if doOutputting:
+        print(*args, end = end);
 
 def run():
      while True:

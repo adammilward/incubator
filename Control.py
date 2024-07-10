@@ -152,7 +152,8 @@ class Control:
     def isFanRequired(self):
         hysteresis = int(self.fanWasOn) * self.io.fruitHysteresis
         return (self.sensors.fruitMedian < self.io.targetFruitTemp + hysteresis
-                and self.sensors.fruitMax < self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis)
+                and self.sensors.fruitMax < self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis
+                and self.sensors.spawnMax > self.io.targetFruitTemp + hysteresis * 2)
 
     def fanAction(self):
         if self.isFanRequired() and self.io.fanActive:
