@@ -82,8 +82,10 @@ class Control:
                 and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.1):
                 self.io.heaterOnPercent *= 1.1
 
-            if heaterOnSeconds > 200 or self.io.heaterOnPercent > 100:
-                raise Exception("heaterOnSeconds out of range: " + str(heaterOnSeconds))
+        if heaterOnSeconds > 100 or self.io.heaterOnPercent > 50:
+            self.io.heaterOnPercent = 10
+            heaterOnSeconds = self.io.heaterOnPercent * self.io.heatingPeriod / 100
+            self.io.output("heaterOnPercent exceeded 50%. Resetting to 10%")
  
         heatingTimeLeft = self.heatingPeriodStartTs + heaterOnSeconds - now
 

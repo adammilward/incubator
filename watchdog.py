@@ -74,16 +74,22 @@ def output(*args, end = '\n'):
         print(*args, end = end);
 
 def run():
+     attempts = 0
      while True:
         time.sleep(10)
 
         try:
             readWriteTs(0)
+            attempts = 0
         except Exception as e:
+            print(Exception, attempts, datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
             print(e)
-            killAll()
             traceback.print_exc()
-            run()
+            time.sleep(5)
+            if attempts >= 6:
+                killAll()
+
+            attempts = attempts + 1
      
 
 run()
