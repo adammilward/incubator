@@ -30,8 +30,8 @@ class Control:
         self.camera = Camera.Camera()
         self.lastCaptureHour = 99
 
-        self.sunrise = 10
-        self.sunset = 18
+        self.sunrise = 0
+        self.sunset = 24
 
         self.sensors = SensorRead.SensorRead()
         self.lastMonitoredTemp = self.sensors.meanTemp
@@ -57,7 +57,7 @@ class Control:
     def action(self):
         self.heatAction()
         self.fanAction()
-        self.lightAction()
+        # self.lightAction()
         self.displayAction('a')
         if (self.heater.is_lit 
             and self.sensors.medianTemp > self.io.idiotCheckMedTemp):
@@ -82,10 +82,9 @@ class Control:
                 and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.1):
                 self.io.heaterOnPercent *= 1.1
 
-        if heaterOnSeconds > 100 or self.io.heaterOnPercent > 50:
-            self.io.heaterOnPercent = 10
-            heaterOnSeconds = self.io.heaterOnPercent * self.io.heatingPeriod / 100
-            self.io.output("heaterOnPercent exceeded 50%. Resetting to 10%")
+        if self.io.heaterOnPercent > 100:
+            self.io.heaterOnPercent = 100
+            
  
         heatingTimeLeft = self.heatingPeriodStartTs + heaterOnSeconds - now
 
@@ -139,11 +138,6 @@ class Control:
         if (self.sensors.spawnMax >= val):
             self.dontHeatReasons += ['self.sensors.spawnMax >=' + str(val)]
 
-        if self.io.fanActive:
-            val = self.io.targetFruitTemp + self.io.fruitMaxOffset + 0.3 + hysteresis
-            if (self.sensors.fruitMax >= val):
-                self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
-
         # idiot checks
         val = self.io.idiotCheckMedTemp - 1
         if (self.sensors.medianTemp >= val):
@@ -158,7 +152,11 @@ class Control:
                 and self.sensors.spawnMedian > self.io.targetFruitTemp + hysteresis * 2)
 
     def fanAction(self):
-        if self.isFanRequired() and self.io.fanActive:
+        hour = int(datetime.now().strftime("%H"))
+
+        if (hour >= self.sunrise and hour < self.sunset
+            and self.sensors.humidity > self.io.minHumidity
+            and self.io.fanActive):
             self.fanOn()
         else:
             self.fanOff()
@@ -175,7 +173,7 @@ class Control:
             self.lightOn()
             lightsOn = True
         else:
-            self.lightOff()
+            self.lightOffOff()
             lightsOn = False    
 
         if (hour != self.lastCaptureHour):
