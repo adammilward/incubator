@@ -10,11 +10,19 @@
 # led   10  G
 
 import Control
+import traceback
 
-control = Control.Control();
-
-control.read()
-
-control.run()
-
-control.allOff()
+while True:
+    control = False
+    try:
+        control = Control.Control()
+        control.read()
+        control.run()
+        control.allOff()
+    
+    except Exception as e:
+        control.allOff()
+        del(control)
+        print('inpcubate.py: Exception caught, control destoryed, restarting.')
+        print(str(e))
+        traceback.print_exc()

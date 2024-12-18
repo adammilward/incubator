@@ -8,6 +8,10 @@ class Camera:
     def __init__(self):
         self.camera = PiCamera()
 
+    def __del__(self):
+        self.camera.close()
+        print('inside Camera, piCamera closed, Camera destroyed.')
+
     def capture(self, hour = ''):
         try:
             self.camera.annotate_text = datetime.now().strftime("%Y/%m/%d %H:%M:%S")

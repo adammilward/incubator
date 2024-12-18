@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 import PeakDetect
 import time
+import traceback
 
 os.system('modprobe w1-gpio')
 os.system('modprobe w1-therm')
@@ -34,10 +35,10 @@ class SensorRead:
         self.maxTemp = 0
         self.detectors = [PeakDetect.PeakDetect() for i in range(tempsCount)]
 
-        print("Found folders: ")
-        print(self.deviceFolders)
-        self.readAll()
-        print(self.temps)
+        #print("Found folders: ")
+        #print(self.deviceFolders)
+        #self.readAll()
+        #print(self.temps)
 
     def readAll(self):
         self.readHumidity()
@@ -49,7 +50,13 @@ class SensorRead:
             self.detectors[i].addValue(time.time(), self.temps[i])
 
     def readHumidity(self):
-        self.humidity = self.htSensor.relative_humidity
+        try:
+            self.humidity = self.htSensor.relative_humidity
+        except Exception as e:
+            print ("Humidity read exception")
+            print(str(e))
+            #traceback.print_exc()
+            self.humidity = -1
 
     def readTemps(self):
         htTemps = []
@@ -64,9 +71,10 @@ class SensorRead:
 
         self.meanTemp = round(statistics.median(self.temps), 2)
 
+        self.heater = self.temps[0]
         self.medianTemp = statistics.median(self.temps)
-        self.fruitMedian = statistics.median(self.temps[0:3])
-        self.fruitMax = max(self.temps[0:3])
+        self.fruitMedian = statistics.median(self.temps[1:3])
+        self.fruitMax = max(self.temps[1:3])
         self.spawnMedian = statistics.median(self.temps[3:6])
         self.spawnMax = max(self.temps[3:6])
         self.minTemp = min(self.temps) 
@@ -114,5 +122,5 @@ class SensorRead:
         else:
             self.offsets = [0.0 for i in range(len(self.temps))]
         
-        print('getOffsets')
-        print(self.offsets)
+        #print('getOffsets')
+        #print(self.offsets)

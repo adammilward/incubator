@@ -11,13 +11,13 @@ class UserIO:
 
         # 25/26 for spawn, 21 air temp for fruiting, 23 (max 24) for substrate
 
-        self.targetFruitTemp = 21.5
-        self.targetSpawnTemp = 25.5
-        self.maxTemp = 32
-        self.idiotCheckMedTemp = 28
+        self.targetFruitTemp = 22 #21
+        self.targetSpawnTemp = 25 #25
+        self.maxTemp = 33 #34
+        self.idiotCheckMedTemp = 26 #28
 
-        self.heaterOnPercent = 5
-        self.heatingPeriod = 200
+        self.heaterOnPercent = 10 #10
+        self.heatingPeriod = 60
         self.displayTempsTime = 600
 
         self.spawnHysteresis = 0.1
@@ -25,8 +25,9 @@ class UserIO:
         self.fruitHysteresis = 0.1
         self.fruitMaxOffset = 0.5
 
-        self.lightsActive = True
-        self.fanActive = True
+        self.lightsActive = False
+        self.isFruiting = True
+        self.fanActive = False
 
         self.END      = '\33[0m'
         self.BOLD     = '\33[1m'
@@ -121,7 +122,6 @@ class UserIO:
             )
     
         temps = ['' for i in range(len(self.sensors.temps))]
-        print(self.colourTemp(self.sensors.temps[0], self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset), end = '')
         print(self.colourTemp(self.sensors.temps[1], self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset), end = '')
         print(self.colourTemp(self.sensors.temps[2], self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset), end = '')
         print(self.colourTemp(self.sensors.temps[3], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
@@ -129,7 +129,8 @@ class UserIO:
         print(self.colourTemp(self.sensors.temps[5], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
         print(end = self.END)
         
-        print(" || T:", str(self.sensors.temps[6]) + ' RH: ' + '{:.1f}'.format(self.sensors.humidity), end = ' ')
+        print(" || H:" + str(self.sensors.temps[0]) + " T:" + 
+              str(self.sensors.temps[6]) + ' RH:' + '{:.1f}'.format(self.sensors.humidity), end = ' ')
         print(dontHeatReasons, end='')
         print(self.END)
 
@@ -139,10 +140,10 @@ class UserIO:
         return f" | targets: {a} {b} | {self.END}"  
 
     def colourTemp(self, temp, target, hysteresis, maxOffset):
-        return f"{self.targetColour(temp, target, hysteresis, maxOffset)} {temp} {self.END} "
+        return f"{self.targetColour(temp, target, hysteresis, maxOffset)} {temp:.1f} {self.END} "
 
     def colourTempTarget(self, temp, target, hysteresis, maxOffset):
-        return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp}({target}){self.END}"
+        return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp:.1f}({target}){self.END}"
 
     def targetColour(self, temp, target, hysteresis, maxOffset):
         if temp == target:
@@ -243,7 +244,7 @@ class UserIO:
             espeak.synth('{:.1f}'.format(temp))
 
     def soundAllarm(self):
-        i = 5
+        i = 2
         while i:
             espeak.synth("Woooooop. Woooooop!")
             time.sleep(1)
@@ -251,7 +252,7 @@ class UserIO:
             time.sleep(1)
             espeak.synth("Emergency!")
             time.sleep(3)
-            i -= 1
+            i = i - 1
 
     def userInputs(self):
         if self.lightsActive:

@@ -49,10 +49,15 @@ class Control:
 
         self.lastDisplayTs = int(time.time()) - self.io.displayTempsTime
 
+    def __del__(self):
+        print ("Control destroyed");
+        #del(self.camera)
+
     def allOff(self):
         self.heater.off();
         self.dcPow.off()
         self.fan.off()
+        print('allOff')
       
     def action(self):
         self.heatAction()
@@ -78,7 +83,7 @@ class Control:
             self.heaterCycleCount += 1
             self.heatingPeriodStartTs = int(time.time())
 
-            if (self.heaterCycleCount >= 5
+            if (self.heaterCycleCount * self.io.heatingPeriod >= 1000
                 and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.1):
                 self.io.heaterOnPercent *= 1.1
 
@@ -95,7 +100,7 @@ class Control:
             if heatingTimeLeft < 15:
                 #print('sleep', heatingTimeLeft)
                 time.sleep(heatingTimeLeft)
-                self.displayAction('c')
+                #self.displayAction('c')
                 self.heaterOff()
         else :
             self.heaterOff()
@@ -107,11 +112,11 @@ class Control:
             elapsedSeconds = int(time.time()) - self.heatingPeriodStartTs
             modifier = (elapsedSeconds) / self.io.heatingPeriod
             
-            if(self.heaterCycleCount <= 2):
+            if(self.heaterCycleCount * self.io.heatingPeriod <= 400):
                 modifier = math.sqrt(modifier)
                 modifier = modifier / 2 + 0.5
                 self.io.heaterOnPercent = self.io.heaterOnPercent * modifier
-            elif(self.heaterCycleCount <= 5):
+            elif(self.heaterCycleCount * self.io.heatingPeriod <= 1000):
                 modifier = math.sqrt(math.sqrt(modifier))
                 modifier = modifier / 2 + 0.5
                 self.io.heaterOnPercent = self.io.heaterOnPercent * modifier
@@ -139,7 +144,7 @@ class Control:
         if (self.sensors.spawnMax >= val):
             self.dontHeatReasons += ['self.sensors.spawnMax >=' + str(val)]
 
-        if self.io.fanActive:
+        if self.io.isFruiting:
             val = self.io.targetFruitTemp + self.io.fruitMaxOffset + 0.3 + hysteresis
             if (self.sensors.fruitMax >= val):
                 self.dontHeatReasons += ['self.sensors.fruitMax >= ' + str(val)]
@@ -318,19 +323,20 @@ class Control:
             except KeyboardInterrupt:
                 self.allOff()
                 self.lightOn()
-                self.io.output('allOff, KeyboardInterrupt')
+                self.io.output('KeyboardInterrupt')
                 self.io.userOptions()
                 self.lastCaptureHour = 100
                 self.writeIncubateTs(60)
 
             except Exception as e:
                 self.allOff()
-                self.io.output('allOff')
-                self.io.output("FAILURE!")
+                self.io.output("FAILURE! All things turned off.")
+                self.io.soundAllarm()
                 self.io.output(str(e))
                 traceback.print_exc()
-                self.io.soundAllarm()
-                self.writeIncubateTs(30)
+                self.writeIncubateTs(300)
+                time.sleep(300)
+                raise e
             
             self.displayTemps('restart')
             
