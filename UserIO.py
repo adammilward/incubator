@@ -13,17 +13,17 @@ class UserIO:
 
         self.targetFruitTemp = 22 #21
         self.targetSpawnTemp = 25 #25
-        self.maxTemp = 33 #34
+        self.maxTemp = 35 #34
         self.idiotCheckMedTemp = 26 #28
 
-        self.heaterOnPercent = 10 #10
-        self.heatingPeriod = 60
+        self.heaterOnPercent = 2 #
+        self.heatingPeriod = 10
         self.displayTempsTime = 600
 
-        self.spawnHysteresis = 0.1
-        self.spawnMaxOffset = 0.8
-        self.fruitHysteresis = 0.1
-        self.fruitMaxOffset = 0.5
+        self.spawnHysteresis = 0
+        self.spawnMaxOffset = 1
+        self.fruitHysteresis = 0
+        self.fruitMaxOffset = 1
 
         self.lightsActive = False
         self.isFruiting = True
@@ -114,8 +114,8 @@ class UserIO:
                 + heaterCycleCount + ' | '
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
                 + str(self.tempStatus(isHeatingRequired, heaterIsOn, fanIsOn)) + " | "
-                + '{:.1f}'.format(self.heaterOnPercent, 1) + '% ' 
-                + '{:.1f}'.format(self.heaterOnPercent * self.heatingPeriod / 100) + 's | '
+                + '{:.2f}'.format(self.heaterOnPercent, 1) + '% ' 
+                + '{:.2f}'.format(self.heaterOnPercent * self.heatingPeriod / 100) + 's | '
                 + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn)
                 + self.targets()
                 , end = ""

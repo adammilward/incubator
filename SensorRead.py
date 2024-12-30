@@ -5,7 +5,6 @@ import adafruit_am2320
 import statistics
 import json
 from pathlib import Path
-from datetime import datetime
 import PeakDetect
 import time
 import traceback
@@ -53,7 +52,7 @@ class SensorRead:
         try:
             self.humidity = self.htSensor.relative_humidity
         except Exception as e:
-            print ("Humidity read exception")
+            print ("Exception caught reading htHumidity sensor caught (ignoing)")
             print(str(e))
             #traceback.print_exc()
             self.humidity = -1
@@ -63,8 +62,12 @@ class SensorRead:
         for i, folder in enumerate(self.deviceFolders):
             deviceFile = folder + '/w1_slave'
             self.temps[i] = round((self.read_temp(i) + self.offsets[i]), 1)
-            if (i % 2 == 0):
-                htTemps.append(self.htSensor.temperature)
+            if (i % 5 == 0):
+                try:
+                    htTemps.append(self.htSensor.temperature)
+                except OSError as e:
+                    print('OSError exception caught reading htTemps temperature. Rsisig SenorReadExcepon')
+                    raise SensorReadException(str(e))
 
         lastSensorIndex = len(self.deviceFolders)
         self.temps[lastSensorIndex] = round((statistics.median(htTemps) + self.offsets[lastSensorIndex]), 1)
@@ -88,6 +91,11 @@ class SensorRead:
     
     def read_temp(self, i):
         lines = self.read_temp_raw(self.deviceFolders[i] + '/w1_slave')
+        
+        if not (1 < len(lines)):
+            print(lines)
+            raise SensorReadException("Could not read temp, insufficien lines")
+        
         equals_pos = lines[1].find('t=')
         if equals_pos != -1:
             temp_string = lines[1][equals_pos+2:]
@@ -124,3 +132,6 @@ class SensorRead:
         
         #print('getOffsets')
         #print(self.offsets)
+
+class SensorReadException(Exception):
+    pass
