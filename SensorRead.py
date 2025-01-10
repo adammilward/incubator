@@ -14,7 +14,7 @@ os.system('modprobe w1-therm')
 
 class SensorRead:
     def __init__(self):
-        self.OFFSETS_FILE = 'offsets.json'
+        self.OFFSETS_FILE = '/home/adam/python/offsets.json'
 
         base_dir = '/sys/bus/w1/devices/'
         self.deviceFolders = glob.glob(base_dir + '28*')
@@ -32,6 +32,7 @@ class SensorRead:
         self.fruitMedian = 0
         self.minTemp = 0
         self.maxTemp = 0
+        self.heaterTemp = 0
         self.detectors = [PeakDetect.PeakDetect() for i in range(tempsCount)]
 
         #print("Found folders: ")
@@ -61,30 +62,37 @@ class SensorRead:
         htTemps = []
         for i, folder in enumerate(self.deviceFolders):
             deviceFile = folder + '/w1_slave'
-            self.temps[i] = round((self.read_temp(i) + self.offsets[i]), 1)
-            if (i % 5 == 0):
+            self.temps[i] = self.read_temp(i) + self.offsets[i]
+            if (i % 2 == 0):
                 try:
                     htTemps.append(self.htSensor.temperature)
                 except OSError as e:
-                    print('OSError exception caught reading htTemps temperature. Rsisig SenorReadExcepon')
+                    print('OSError exception caught reading htTemps temperature sensor. Rsisig SenorReadException')
                     raise SensorReadException(str(e))
 
         lastSensorIndex = len(self.deviceFolders)
-        self.temps[lastSensorIndex] = round((statistics.median(htTemps) + self.offsets[lastSensorIndex]), 1)
+        self.temps[lastSensorIndex] = statistics.median(htTemps) + self.offsets[lastSensorIndex]
 
-        self.meanTemp = round(statistics.median(self.temps), 2)
 
-        self.heater = self.temps[0]
+        self.heaterTemp = self.temps[0]
+        self.maxTemp = max(self.temps[1:6])
+        self.fruitMedian = statistics.median(self.temps[1:2])
+        self.fruitMax = max(self.temps[1:2])
+        self.spawnMedian = statistics.median(self.temps[2:6])
+        self.spawnMax = max(self.temps[2:6])
+
+        self.meanTemp = statistics.mean(self.temps)
         self.medianTemp = statistics.median(self.temps)
-        self.fruitMedian = statistics.median(self.temps[1:3])
-        self.fruitMax = max(self.temps[1:3])
-        self.spawnMedian = statistics.median(self.temps[3:6])
-        self.spawnMax = max(self.temps[3:6])
         self.minTemp = min(self.temps) 
-        self.maxTemp = max(self.temps)
+
 
     def read_temp_raw(self, deviceFile):
-        f = open(deviceFile, 'r')
+        try:
+            f = open(deviceFile, 'r')
+        except OSError as e:
+            print('OSError exception caught reading one wire device folder (temperature)')
+            raise SensorReadException(str(e))
+
         lines = f.readlines()
         f.close()
         return lines
@@ -94,7 +102,7 @@ class SensorRead:
         
         if not (1 < len(lines)):
             print(lines)
-            raise SensorReadException("Could not read temp, insufficien lines")
+            raise SensorReadException("Could not read one wire temp output, insufficien lines")
         
         equals_pos = lines[1].find('t=')
         if equals_pos != -1:
@@ -102,22 +110,24 @@ class SensorRead:
             temp_c = float(temp_string) / 1000.0
             return temp_c
         else:
-            raise Exception("could not read temp")
+            raise Exception("could not read one wire temp sensor" + str(i))
         
     def calibrate(self):
         self.offsets = [0 for i in range(len(self.temps))]
         self.readTemps()
+        mean = statistics.mean(self.temps[0:6])
+        print(mean)
         for i, temp in enumerate(self.temps):
-            self.offsets[i] = self.meanTemp - self.temps[i]
+            self.offsets[i] = round(mean - self.temps[i], 3)
         self.recordOffsets()
 
-        print('temps before offset')
-        print(self.temps)
+        #print('temps before offset')
+        #print(self.temps)
         print('offsets')
         print(self.offsets)
-        self.readTemps()
-        print('temps after offsets')
-        print(self.temps)
+        #self.readTemps()
+        #print('temps after offsets')
+        #print(self.temps)
 
     def recordOffsets(self):
         with open(self.OFFSETS_FILE, 'w') as offsetsFile:

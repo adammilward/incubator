@@ -115,12 +115,12 @@ class Control:
             self.io.heaterOnPercent *= 1 + (0.0003 * self.io.heatingPeriod)
 
         if heaterOnSeconds > 4 or self.io.heaterOnPercent > 20:
-            self.io.heaterOnPercent = 20
+            self.io.heaterOnPercent = 19
             heaterOnSeconds = self.io.heaterOnPercent * self.io.heatingPeriod / 100
-            self.io.output("heaterOnPercent exceeded 20%. Resetting to 20%")
+            self.io.output("heaterOnPercent exceeded 20%. Resetting to 19%")
 
         if (heaterOnSeconds > 4):
-            raise Exception('heaterOSeconds isgreter than 4')
+            raise Exception('heaterSeconds is greter than 4')
         
         self.heaterOn()
         time.sleep(heaterOnSeconds)
@@ -139,10 +139,6 @@ class Control:
         self.dontHeatReasons = []
         hysteresis = int(self.heatingWasRequired) * self.io.spawnHysteresis
 
-        val = self.io.maxTemp + hysteresis
-        if (self.sensors.maxTemp >= val):
-            self.dontHeatReasons += ['maxTemp >= ' + str(val)]
-
         val = self.io.targetSpawnTemp + hysteresis
         if (self.sensors.spawnMedian >= val):
             self.dontHeatReasons += ['spawnMedian >= ' + str(val)]
@@ -150,6 +146,14 @@ class Control:
         val = self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis
         if (self.sensors.spawnMax >= val):
             self.dontHeatReasons += ['spawnMax >=' + str(val)]
+
+        val = self.io.maxTemp + hysteresis
+        if (self.sensors.maxTemp >= val):
+            self.dontHeatReasons += ['maxTemp >= ' + str(val)]
+
+        val = self.io.heaterTemp + hysteresis
+        if (self.sensors.heaterTemp >= val):
+            self.dontHeatReasons += ['heaterTemp >= ' + str(val)]
 
         if self.io.isFruiting:
             val = self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis
@@ -267,20 +271,22 @@ class Control:
         except SensorRead.SensorReadException as e:
             raise e
         except Exception as e:
-            self.io.output("Exception cought reading sensors. rasing SensorReadExceptioon")
-            self.io.output(str(e))
+            self.io.output("Unhandled Exception cought reading sensors. rasing SensorReadException")
+            print(str(e))
             traceback.print_exc()
-            raise SensorRead.SensorReadException('Caught exception reading sensors')
+            raise SensorRead.SensorReadException('Unhandled Exception cought reading sensors')
             
         self.detectPeaks()
     
     def detectPeaks(self):
-        indexs = [0,3,4,5,6]
+        indexs = []
+        #indexs = [0,2,3,4,5]
+        #indexs = [0,3,4,5,6]
         for index in indexs:
             detector = self.sensors.detectors[index]
             direction = detector.detect()
 
-            if (direction < 0):
+            if (direction):
                 elapsed = self.periodElapsedSeconds
                 if elapsed < self.io.heatingPeriod / 2:
                     elapsed += self.io.heatingPeriod
@@ -291,8 +297,6 @@ class Control:
                     detector, 
                     elapsed
                 )
-            
-            index += 1
 
     def watchDog(self):
         nowTs = int(time.time())
@@ -300,7 +304,13 @@ class Control:
         self.writeIncubateTs(0)
         
         watchdog = open('/home/adam/python/watchdog.ts', 'r')
-        watchdogTs = int(watchdog.read())
+        try:
+            watchdogTs = int(watchdog.read())
+        except Exception as e:
+            print('watchdog read exception contents of file are:')
+            print(watchdog.read())
+            raise e
+        
         watchdog.close()
 
         if watchdogTs < nowTs - 20: # how many seconds is allowed?
@@ -325,12 +335,6 @@ class Control:
                         self.action()
                     time.sleep(0.1)
 
-            except SensorRead.SensorReadException as e:
-                self.allOff()
-                self.io.output("Sensor Read Exception")
-                self.io.output(str(e))
-                #traceback.print_exc()
-
             except KeyboardInterrupt:
                 self.allOff()
                 self.writeIncubateTs(30)
@@ -339,6 +343,12 @@ class Control:
                 self.io.userOptions()
                 self.lastCaptureHour = 100
 
+            except SensorRead.SensorReadException as e:
+                self.allOff()
+                self.io.output("Sensor Read Exception")
+                print(str(e))
+                #traceback.print_exc()
+                
             except Exception as e:
                 self.allOff()
                 self.writeIncubateTs(30)

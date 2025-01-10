@@ -21,6 +21,9 @@ class PeakDetect:
         else:
             self.history = self.history[1:] + [value]
 
+    ## returns -1 if peak detected (and falling),
+    # returns 1 if trough detected (and rising)
+    # else returns 0 
     def detect(self):
         if len(self.history) < self.sampleCount:
             return False

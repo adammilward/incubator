@@ -11,23 +11,25 @@ class UserIO:
 
         # 25/26 for spawn, 21 air temp for fruiting, 23 (max 24) for substrate
 
-        self.targetFruitTemp = 22 #21
+        self.targetFruitTemp = 25 #21
         self.targetSpawnTemp = 25 #25
-        self.maxTemp = 35 #34
+        self.maxTemp = 26 #26
+        self.heaterTemp = 39 #39
         self.idiotCheckMedTemp = 26 #28
 
-        self.heaterOnPercent = 2 #
-        self.heatingPeriod = 10
-        self.displayTempsTime = 600
+        self.heaterOnPercent = 4 #2
+        self.displayTempsTime = 3600 #3600
 
         self.spawnHysteresis = 0
-        self.spawnMaxOffset = 1
+        self.spawnMaxOffset = 0.5
         self.fruitHysteresis = 0
-        self.fruitMaxOffset = 1
+        self.fruitMaxOffset = 0.5
 
         self.lightsActive = False
         self.isFruiting = True
         self.fanActive = False
+
+        self.heatingPeriod = 10 #10 do not change
 
         self.END      = '\33[0m'
         self.BOLD     = '\33[1m'
@@ -94,7 +96,7 @@ class UserIO:
 
         if (not isHeatingRequired) and heaterIsOn:
             print(dontHeatReasons, heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn, elapsedSeconds, heaterCycleCount, message)
-            raise Exception('Heater should not be on!!!')
+            raise Exception('Heater should not be on!!! 1')
         
         if self.sensors.medianTemp > self.idiotCheckMedTemp:
             print(dontHeatReasons, heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn, elapsedSeconds, heaterCycleCount, message)
@@ -115,7 +117,7 @@ class UserIO:
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
                 + str(self.tempStatus(isHeatingRequired, heaterIsOn, fanIsOn)) + " | "
                 + '{:.2f}'.format(self.heaterOnPercent, 1) + '% ' 
-                + '{:.2f}'.format(self.heaterOnPercent * self.heatingPeriod / 100) + 's | '
+                + '{:.2f}'.format(self.heaterOnPercent * self.heatingPeriod / 100) + 's |'
                 + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn)
                 + self.targets()
                 , end = ""
@@ -123,27 +125,28 @@ class UserIO:
     
         temps = ['' for i in range(len(self.sensors.temps))]
         print(self.colourTemp(self.sensors.temps[1], self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset), end = '')
-        print(self.colourTemp(self.sensors.temps[2], self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset), end = '')
+        print(self.colourTemp(self.sensors.temps[2], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
         print(self.colourTemp(self.sensors.temps[3], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
         print(self.colourTemp(self.sensors.temps[4], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
         print(self.colourTemp(self.sensors.temps[5], self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset), end = '')
         print(end = self.END)
         
-        print(" || H:" + str(self.sensors.temps[0]) + " T:" + 
-              str(self.sensors.temps[6]) + ' RH:' + '{:.1f}'.format(self.sensors.humidity), end = ' ')
+        print(" || H:" + '{:.1f}'.format(self.sensors.temps[0]) +
+              " T:" + '{:.1f}'.format(self.sensors.temps[6]) + 
+              ' RH:' + '{:.0f}'.format(self.sensors.humidity), end = ' ')
         print(dontHeatReasons, end='')
         print(self.END)
 
     def targets(self,):
         a = self.colourTempTarget(self.sensors.fruitMedian, self.targetFruitTemp, self.fruitHysteresis, self.fruitMaxOffset)
         b = self.colourTempTarget(self.sensors.spawnMedian, self.targetSpawnTemp, self.spawnHysteresis, self.spawnMaxOffset)
-        return f" | targets: {a} {b} | {self.END}"  
+        return f"| targets: {a} {b} | {self.END}"  
 
     def colourTemp(self, temp, target, hysteresis, maxOffset):
-        return f"{self.targetColour(temp, target, hysteresis, maxOffset)} {temp:.1f} {self.END} "
+        return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp:.1f} {self.END} "
 
     def colourTempTarget(self, temp, target, hysteresis, maxOffset):
-        return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp:.1f}({target}){self.END}"
+        return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp:.1f}({target}) {self.END}"
 
     def targetColour(self, temp, target, hysteresis, maxOffset):
         if temp == target:
@@ -214,10 +217,10 @@ class UserIO:
         for record in detector.history:
             temps.append(record['temp'])
         if (direction < 0):
-            print (self.ITALIC, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| falling, max was:', detector.recentMax, end=' ')
+            print (self.RED2, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| falling, max was:', detector.recentMax, end=' ')
             print(temps, self.END)
         elif (direction > 0):
-            print (self.ITALIC, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| rising, min was:', detector.recentMin, end='')
+            print (self.BLUE2, i, datetime.now().strftime("| %H:%M:%S"), '| ', elapsed, '| rising, min was:', detector.recentMin, end='')
             print(temps, self.END)
 
 
@@ -226,7 +229,7 @@ class UserIO:
 
         espeak.synth('{:.1f}'.format(self.sensors.maxTemp))
         espeak.synth("Current temps: mean. ")
-        espeak.synth('{:.1f}'.format(self.sensors.meanTemp))
+        espeak.synth('{:.1f}'.format(self.sensors.medianTemp))
         espeak.synth("Current temps: min. ")
         espeak.synth('{:.1f}'.format(self.sensors.meanTemp))
         self.speakProbes()
@@ -280,8 +283,11 @@ class UserIO:
         targetSpawnTemp = self.input("Enter spawn target temp. Default is " + str(self.targetSpawnTemp) + ": ")
         if not targetSpawnTemp: targetSpawnTemp = self.targetSpawnTemp
 
-        maxTemp = self.input("Enter overall max temp. Default is " + str(self.maxTemp) + ": ")
+        maxTemp = self.input("Enter max temp. Default is " + str(self.maxTemp) + ": ")
         if not maxTemp: maxTemp = self.maxTemp
+
+        heaterTemp = self.input("Enter max heater temp. Default is " + str(self.heaterTemp) + ": ")
+        if not heaterTemp: heaterTemp = self.heaterTemp
 
         displayTempsTime = self.input("Display temps time, default is " + str(self.displayTempsTime) + ": ")
         if not displayTempsTime: displayTempsTime = self.displayTempsTime
@@ -289,13 +295,14 @@ class UserIO:
         self.targetFruitTemp = float(targetFruitTemp)
         self.targetSpawnTemp = float(targetSpawnTemp)
         self.maxTemp = float(maxTemp)
+        self.heaterTemp = float(heaterTemp)
         self.heaterOnPercent = float(heaterOnPercent)
         self.displayTempsTime = int(displayTempsTime)
 
         self.lightsActive = (lightsActive == '1' or lightsActive[0].lower() == 'y')
         self.fanActive = (fanActive == '1' or fanActive[0].lower() == 'y')
 
-        self.output(
+        print(
             ''
                 + "Lighting active is "
                 + str(self.lightsActive)
@@ -313,7 +320,7 @@ class UserIO:
     
     def input(self, string):
         print(string, end = '')
-        espeak.synth(string)
+        #espeak.synth(string)
         return input()
 
     def output(self, string):
@@ -338,7 +345,7 @@ class UserIO:
         elif request == "c":
             return self.capture()
         elif request == "ca":
-            #return self.calibrate() #uncomment to calibrate
+            return self.calibrate() #uncomment to calibrate
             return
         else:
             return self.output("Command not recognised")

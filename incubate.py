@@ -1,6 +1,6 @@
 # 3.3v  x   x   5v
-# SDA   x   x   5v
-# SLC   x   x   GND
+# SDA   2   x   5v
+# SLC   3   x   GND
 # 1W    4   14  
 # GND   x   15
 # HEAT  17  18
@@ -8,6 +8,8 @@
 # fan   22  23
 #      3.3  24
 # led   10  G
+#        9  25
+#       11  8
 
 import Control
 import traceback
