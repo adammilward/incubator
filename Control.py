@@ -10,16 +10,18 @@ import Camera
 
 class Control:
     def __init__(self):
-        self.writeIncubateTs(10)
+        self.HEAING_REALISATION_PERIOD = 600
 
-        self.heater = LED(17)
-        self.dcPow = LED(27)
-        self.fan = LED(22)
-        self.light = LED(10)
-        self.heater.off()
-        self.dcPow.off()
-        self.fan.off()
-        self.light.off()
+        self.HEATER = LED(17)
+        self.DC_POWER = LED(27)
+        self.FAN = LED(22)
+        self.LIGHT = LED(10)
+        self.HEATER.off()
+        self.DC_POWER.off()
+        self.FAN.off()
+        self.LIGHT.off()
+
+        self.writeIncubateTs(10)
         self.lightOn()
 
         self.periodStartTs = 0
@@ -43,9 +45,9 @@ class Control:
         self.lightWasOn = False
         self.heatingWasRequired = False
         self.dontHeatReasons = []
-        self.periodStartTs = 0
         self.periodElapsedSeconds = 0
         self.previousPeriodElapsedSeconds = 0
+        self.lastIncreaseSeconds = 0
         self.heaterWasPropperActive = True
 
         self.io = UserIO.UserIO(self.sensors, self.camera)
@@ -57,9 +59,9 @@ class Control:
         #del(self.camera)
 
     def allOff(self):
-        self.heater.off();
-        self.dcPow.off()
-        self.fan.off()
+        self.HEATER.off();
+        self.DC_POWER.off()
+        self.FAN.off()
         print('allOff')
       
     def action(self):
@@ -67,6 +69,8 @@ class Control:
         if (self.heatingWasRequired != self.isHeatingRequired()
             or self.periodStartTs == 0):
             self.periodStartTs = now
+            self.lastIncreaseSeconds = 0
+
         self.periodElapsedSeconds = now - self.periodStartTs
         
         self.heatAction()
@@ -74,14 +78,14 @@ class Control:
         self.lightAction()
         self.displayAction('a')
         
-        self.fanWasOn = self.fan.is_lit
-        self.lightWasOn = self.light.is_lit
-        self.dcPowWasOn = self.dcPow.is_lit
+        self.fanWasOn = self.FAN.is_lit
+        self.lightWasOn = self.LIGHT.is_lit
+        self.dcPowWasOn = self.DC_POWER.is_lit
         self.heatingWasRequired = self.isHeatingRequired()
-        self.heaterWasOn = self.heater.is_lit
+        self.heaterWasOn = self.HEATER.is_lit
         self.previousPeriodElapsedSeconds = self.periodElapsedSeconds
         
-        if (self.heater.is_lit 
+        if (self.HEATER.is_lit 
             and self.sensors.medianTemp > self.io.idiotCheckMedTemp):
             self.displayTemps('Err')
             raise Exception('Heater should not be on median temp is' + str(self.sensors.medianTemp))
@@ -93,30 +97,13 @@ class Control:
             self.heaterInactive()
 
     def activateHeater(self):
-        if (self.heatingWasRequired != self.isHeatingRequired()
-            and self.heaterWasPropperActive):
-            if (self.previousPeriodElapsedSeconds >= 2400):
-                self.io.heaterOnPercent *= 0.5
-            elif (self.previousPeriodElapsedSeconds >= 1200):
-                self.io.heaterOnPercent *= 0.6
-            elif (self.previousPeriodElapsedSeconds >= 600):
-                self.io.heaterOnPercent *= 0.7
-            elif (self.previousPeriodElapsedSeconds >= 300):
-                self.io.heaterOnPercent *= 0.8
-            elif (self.previousPeriodElapsedSeconds >= 120):
-                self.io.heaterOnPercent *= 0.9
-            else:
-                self.io.heaterOnPercent *= 1
+        self.modifyHeaterOnPercent()
         
-        heaterOnSeconds = self.io.heaterOnPercent * self.io.heatingPeriod / 100
-
-        if (self.periodElapsedSeconds >= 600
-            and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.3):
-            self.io.heaterOnPercent *= 1 + (0.0003 * self.io.heatingPeriod)
+        heaterOnSeconds = self.io.heaterOnPercent * self.io.HEAING_PERIOD / 100
 
         if heaterOnSeconds > 4 or self.io.heaterOnPercent > 20:
             self.io.heaterOnPercent = 19
-            heaterOnSeconds = self.io.heaterOnPercent * self.io.heatingPeriod / 100
+            heaterOnSeconds = self.io.heaterOnPercent * self.io.HEAING_PERIOD / 100
             self.io.output("heaterOnPercent exceeded 20%. Resetting to 19%")
 
         if (heaterOnSeconds > 4):
@@ -127,6 +114,38 @@ class Control:
         self.heaterOff()
         
         self.heaterWasProppeActive = False
+
+    def modifyHeaterOnPercent(self):
+        if (self.heatingWasRequired != self.isHeatingRequired()
+            and self.heaterWasPropperActive):
+            self.reduceHeaterOnPercent()
+        else:
+            self.increaseHeaterOnPercent()
+
+    def increaseHeaterOnPercent(self):
+        if (self.periodElapsedSeconds - self.lastIncreaseSeconds >= self.HEAING_REALISATION_PERIOD
+            and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.3):
+            self.lastIncreaseSeconds += self.HEAING_REALISATION_PERIOD
+            self.io.heaterOnPercent *= 1.2
+            self.io.recordSettings()
+            #self.io.heaterOnPercent *= 1 + (0.0003 * self.io.heatingPeriod)
+
+    def reduceHeaterOnPercent(self):
+        if (self.previousPeriodElapsedSeconds >= 2400):
+            self.io.heaterOnPercent *= 0.5
+        elif (self.previousPeriodElapsedSeconds >= 1200):
+            self.io.heaterOnPercent *= 0.6
+        elif (self.previousPeriodElapsedSeconds >= 600):
+            self.io.heaterOnPercent *= 0.7
+        elif (self.previousPeriodElapsedSeconds >= 300):
+            self.io.heaterOnPercent *= 0.8
+        elif (self.previousPeriodElapsedSeconds >= 120):
+            self.io.heaterOnPercent *= 0.9
+        elif (self.previousPeriodElapsedSeconds >= 60):
+            self.io.heaterOnPercent *= 0.95
+            
+        self.io.recordSettings()
+
 
     def heaterInactive(self):
         if self.heatingWasRequired != self.isHeatingRequired():
@@ -139,9 +158,13 @@ class Control:
         self.dontHeatReasons = []
         hysteresis = int(self.heatingWasRequired) * self.io.spawnHysteresis
 
+        maxOverTemp = 0
+        minUnderTemp = 0
+
         val = self.io.targetSpawnTemp + hysteresis
         if (self.sensors.spawnMedian >= val):
             self.dontHeatReasons += ['spawnMedian >= ' + str(val)]
+        else:
 
         val = self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis
         if (self.sensors.spawnMax >= val):
@@ -203,10 +226,10 @@ class Control:
 
     def displayAction(self, message = ''):
         if (
-            self.heaterWasOn != self.heater.is_lit
-            or self.fanWasOn != self.fan.is_lit
-            or self.lightWasOn != self.light.is_lit
-            or self.dcPowWasOn != self.dcPow.is_lit
+            self.heaterWasOn != self.HEATER.is_lit
+            or self.fanWasOn != self.FAN.is_lit
+            or self.lightWasOn != self.LIGHT.is_lit
+            or self.dcPowWasOn != self.DC_POWER.is_lit
             or self.heatingWasRequired != self.isHeatingRequired()
             ):
             self.displayTemps(message + '  ')
@@ -220,7 +243,7 @@ class Control:
             self.displayTemps(message + '..')
 
     def heaterOff(self):
-        self.heater.off()
+        self.HEATER.off()
     
     def heaterOn(self):
         if self.sensors.medianTemp >= self.io.idiotCheckMedTemp:
@@ -228,37 +251,37 @@ class Control:
             print('too hot!!! something has gone wrong max:', self.sensors.maxTemp)
             self.displayTemps('too hot')
         else:
-            self.heater.on()
+            self.HEATER.on()
 
     def fanOff(self):
-        self.fan.off()
+        self.FAN.off()
         self.dcPowSupply()
         
     def fanOn(self):
-        self.fan.on()
+        self.FAN.on()
         self.dcPowSupply()
 
     def lightOff(self):
-        self.light.off()
+        self.LIGHT.off()
         self.dcPowSupply()
         
     def lightOn(self):
-        self.light.on()
+        self.LIGHT.on()
         self.dcPowSupply()
 
     def dcPowSupply(self):
-        if (self.fan.is_lit or self.light.is_lit):
-            self.dcPow.on()
+        if (self.FAN.is_lit or self.LIGHT.is_lit):
+            self.DC_POWER.on()
         else:
-            self.dcPow.off()
+            self.DC_POWER.off()
 
     def displayTemps(self, message = ''):
         self.io.displayTemps(
                 self.dontHeatReasons,
                 self.isHeatingRequired(),
-                self.fan.is_lit,
-                self.light.is_lit,
-                self.dcPow.is_lit,
+                self.FAN.is_lit,
+                self.LIGHT.is_lit,
+                self.DC_POWER.is_lit,
                 str(int(time.time()) - self.lastDisplayTs),
                 str(self.periodElapsedSeconds),
                 message
@@ -279,8 +302,8 @@ class Control:
         self.detectPeaks()
     
     def detectPeaks(self):
-        indexs = []
-        #indexs = [0,2,3,4,5]
+        #indexs = []
+        indexs = [0,2,3,4,5]
         #indexs = [0,3,4,5,6]
         for index in indexs:
             detector = self.sensors.detectors[index]
@@ -288,8 +311,8 @@ class Control:
 
             if (direction):
                 elapsed = self.periodElapsedSeconds
-                if elapsed < self.io.heatingPeriod / 2:
-                    elapsed += self.io.heatingPeriod
+                if elapsed < self.io.HEAING_PERIOD / 2:
+                    elapsed += self.io.HEAING_PERIOD
 
                 self.io.peakDetected(
                     direction,
@@ -313,14 +336,13 @@ class Control:
         
         watchdog.close()
 
-        if watchdogTs < nowTs - 20: # how many seconds is allowed?
+        if watchdogTs < nowTs - 30: # how many seconds is allowed?
             raise Exception('Watchdog timed out')
         
     def writeIncubateTs(self, delay = 0):
         incubate = open('/home/adam/python/incubate.ts', 'w')
         incubate.write(str(int(time.time()) + delay))
         incubate.close()
-
 
     def run(self):
         while True:

@@ -3,9 +3,15 @@ from espeak import espeak
 from datetime import datetime
 import SensorRead
 import Camera
+import json
+from pathlib import Path
 
 class UserIO:
     def __init__(self, sensors: SensorRead, camera: Camera) -> None:
+
+        self.SETTINGS_FILE = '/home/adam/python/settings.json'
+        self.HEAING_PERIOD = 10 #10 do not change
+
         self.sensors: SensorRead = sensors
         self.camera: Camera = camera
 
@@ -14,13 +20,13 @@ class UserIO:
         self.targetFruitTemp = 25 #21
         self.targetSpawnTemp = 25 #25
         self.maxTemp = 26 #26
-        self.heaterTemp = 39 #39
-        self.idiotCheckMedTemp = 26 #28
+        self.heaterTemp = 40 #39
+        self.idiotCheckMedTemp = 26 #26
 
         self.heaterOnPercent = 4 #2
-        self.displayTempsTime = 3600 #3600
+        self.displayTempsTime = 600 #3600
 
-        self.spawnHysteresis = 0
+        self.spawnHysteresis = -0.0
         self.spawnMaxOffset = 0.5
         self.fruitHysteresis = 0
         self.fruitMaxOffset = 0.5
@@ -28,8 +34,6 @@ class UserIO:
         self.lightsActive = False
         self.isFruiting = True
         self.fanActive = False
-
-        self.heatingPeriod = 10 #10 do not change
 
         self.END      = '\33[0m'
         self.BOLD     = '\33[1m'
@@ -75,6 +79,8 @@ class UserIO:
         self.BEIGEBG2  = '\33[106m'
         self.WHITEBG2  = '\33[107m'
 
+        self.getSettings()
+
     def status(self, appliance):
             if appliance:
                 return "on"
@@ -117,7 +123,7 @@ class UserIO:
                 + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " "
                 + str(self.tempStatus(isHeatingRequired, heaterIsOn, fanIsOn)) + " | "
                 + '{:.2f}'.format(self.heaterOnPercent, 1) + '% ' 
-                + '{:.2f}'.format(self.heaterOnPercent * self.heatingPeriod / 100) + 's |'
+                + '{:.2f}'.format(self.heaterOnPercent * self.HEAING_PERIOD / 100) + 's |'
                 + self.applianceStatus(heaterIsOn, fanIsOn, lightIsOn, dcPowIsOn)
                 + self.targets()
                 , end = ""
@@ -146,7 +152,7 @@ class UserIO:
         return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp:.1f} {self.END} "
 
     def colourTempTarget(self, temp, target, hysteresis, maxOffset):
-        return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp:.1f}({target}) {self.END}"
+        return f"{self.targetColour(temp, target, hysteresis, maxOffset)}{temp:.2f}({target}) {self.END}"
 
     def targetColour(self, temp, target, hysteresis, maxOffset):
         if temp == target:
@@ -271,6 +277,9 @@ class UserIO:
         heaterOnPercent = self.input("Enter heater on percent, default is " + str(self.heaterOnPercent) + ": ")
         if not heaterOnPercent: heaterOnPercent = self.heaterOnPercent
 
+        displayTempsTime = self.input("Display temps time, default is " + str(self.displayTempsTime) + ": ")
+        if not displayTempsTime: displayTempsTime = self.displayTempsTime
+
         lightsActive = self.input("Activate Lighting. Default is " + lightsDefault + ": ")
         if not lightsActive: lightsActive = str(int(self.lightsActive))
 
@@ -289,9 +298,6 @@ class UserIO:
         heaterTemp = self.input("Enter max heater temp. Default is " + str(self.heaterTemp) + ": ")
         if not heaterTemp: heaterTemp = self.heaterTemp
 
-        displayTempsTime = self.input("Display temps time, default is " + str(self.displayTempsTime) + ": ")
-        if not displayTempsTime: displayTempsTime = self.displayTempsTime
-
         self.targetFruitTemp = float(targetFruitTemp)
         self.targetSpawnTemp = float(targetSpawnTemp)
         self.maxTemp = float(maxTemp)
@@ -302,6 +308,10 @@ class UserIO:
         self.lightsActive = (lightsActive == '1' or lightsActive[0].lower() == 'y')
         self.fanActive = (fanActive == '1' or fanActive[0].lower() == 'y')
 
+        self.outputSettings()
+        self.recordSettings()
+
+    def outputSettings(self):
         print(
             ''
                 + "Lighting active is "
@@ -353,4 +363,30 @@ class UserIO:
     def calibrate(self):
             self.sensors.calibrate()
 
-    
+    def recordSettings(self):
+        settings = {
+            'heaterOnPercent': self.heaterOnPercent,
+            'targetFruitTemp': self.targetFruitTemp,
+            'targetSpawnTemp' :self.targetSpawnTemp,
+            'maxTemp': self.maxTemp,
+            'heaterTemp': self.heaterTemp
+        }
+        with open(self.SETTINGS_FILE, 'w') as file:
+            json.dump(settings, file)
+
+    def getSettings(self):
+
+        if (Path(self.SETTINGS_FILE)).exists():
+            try:
+                file = open(self.SETTINGS_FILE)
+                settings = json.load(file)
+                self.heaterOnPercent = settings.get('heaterOnPercent', self.heaterOnPercent)
+                self.targetFruitTemp = settings.get('targetFruitTemp', self.targetFruitTemp)
+                self.targetSpawnTemp = settings.get('targetSpawnTemp', self.targetSpawnTemp)
+                self.maxTemp = settings.get('maxTemp', self.maxTemp)
+                self.heaterTemp = settings.get('heaterTemp', self.heaterTemp)
+            except(json.decoder.JSONDecodeError):
+                pass
+        
+        self.outputSettings()
+

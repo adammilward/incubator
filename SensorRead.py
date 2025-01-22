@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 import PeakDetect
 import time
-import traceback
 
 os.system('modprobe w1-gpio')
 os.system('modprobe w1-therm')
