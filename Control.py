@@ -5,7 +5,6 @@ import UserIO
 import traceback
 from gpiozero import LED
 from datetime import datetime
-import math
 import Camera
 
 class Control:
@@ -50,6 +49,8 @@ class Control:
         self.lastIncreaseSeconds = 0
         self.heaterWasPropperActive = True
 
+        self.heatingIsRequired = False
+
         self.io = UserIO.UserIO(self.sensors, self.camera)
 
         self.lastDisplayTs = int(time.time()) - self.io.displayTempsTime
@@ -66,7 +67,9 @@ class Control:
       
     def action(self):
         now = int(time.time())
-        if (self.heatingWasRequired != self.isHeatingRequired()
+        self.assessHeatingRequired()
+
+        if (self.heatingWasRequired != self.heatingIsRequired
             or self.periodStartTs == 0):
             self.periodStartTs = now
             self.lastIncreaseSeconds = 0
@@ -81,7 +84,7 @@ class Control:
         self.fanWasOn = self.FAN.is_lit
         self.lightWasOn = self.LIGHT.is_lit
         self.dcPowWasOn = self.DC_POWER.is_lit
-        self.heatingWasRequired = self.isHeatingRequired()
+        self.heatingWasRequired = self.heatingIsRequired
         self.heaterWasOn = self.HEATER.is_lit
         self.previousPeriodElapsedSeconds = self.periodElapsedSeconds
         
@@ -91,7 +94,7 @@ class Control:
             raise Exception('Heater should not be on median temp is' + str(self.sensors.medianTemp))
 
     def heatAction(self):
-        if self.isHeatingRequired():
+        if self.heatingIsRequired:
             self.activateHeater()
         else:
             self.heaterInactive()
@@ -116,7 +119,7 @@ class Control:
         self.heaterWasProppeActive = False
 
     def modifyHeaterOnPercent(self):
-        if (self.heatingWasRequired != self.isHeatingRequired()
+        if (self.heatingWasRequired != self.heatingIsRequired
             and self.heaterWasPropperActive):
             self.reduceHeaterOnPercent()
         else:
@@ -148,42 +151,48 @@ class Control:
 
 
     def heaterInactive(self):
-        if self.heatingWasRequired != self.isHeatingRequired():
+        if self.heatingWasRequired != self.heatingIsRequired:
             if (self.previousPeriodElapsedSeconds >= 60):
                 self.heaterWasPropperActive = True
         self.heaterOff()
 
 
-    def isHeatingRequired(self):
+    def assessHeatingRequired(self):
         self.dontHeatReasons = []
         hysteresis = int(self.heatingWasRequired) * self.io.spawnHysteresis
 
-        maxOverTemp = 0
-        minUnderTemp = 0
+        self.tempDiffs = []
 
         val = self.io.targetSpawnTemp + hysteresis
+        self.tempDiffs.append(('spawnMedian', self.sensors.spawnMedian - val))
         if (self.sensors.spawnMedian >= val):
             self.dontHeatReasons += ['spawnMedian >= ' + str(val)]
-        else:
 
         val = self.io.targetSpawnTemp + self.io.spawnMaxOffset + hysteresis
+        self.tempDiffs.append(('spawnMax', self.sensors.spawnMax - val))
         if (self.sensors.spawnMax >= val):
             self.dontHeatReasons += ['spawnMax >=' + str(val)]
 
         val = self.io.maxTemp + hysteresis
+        self.tempDiffs.append(('maxTemp', self.sensors.maxTemp- val))
         if (self.sensors.maxTemp >= val):
             self.dontHeatReasons += ['maxTemp >= ' + str(val)]
 
         val = self.io.heaterTemp + hysteresis
+        self.tempDiffs.append(('heaterTemp', self.sensors.heaterTemp- val))
         if (self.sensors.heaterTemp >= val):
             self.dontHeatReasons += ['heaterTemp >= ' + str(val)]
 
         if self.io.isFruiting:
             val = self.io.targetFruitTemp + self.io.fruitMaxOffset + hysteresis
+            self.tempDiffs.append(('fruitMax', self.sensors.fruitMax- val))
             if (self.sensors.fruitMax >= val):
                 self.dontHeatReasons += ['fruitMax >= ' + str(val)]
 
-        return len(self.dontHeatReasons) == 0
+        self.tempDiffs = sorted(self.tempDiffs, key=lambda item: item[1], reverse = True)
+        self.heatingIsRequired = len(self.dontHeatReasons) = 0
+        return self.heatingIsRequired
+            
 
     def isFanRequired(self):
         hysteresis = int(self.fanWasOn) * self.io.fruitHysteresis
@@ -204,7 +213,6 @@ class Control:
         
         hour = int(datetime.now().strftime("%H"))
 
-    
         if (hour >= self.sunrise and hour < self.sunset):
             self.lightOn()
             lightsOn = True
@@ -230,7 +238,7 @@ class Control:
             or self.fanWasOn != self.FAN.is_lit
             or self.lightWasOn != self.LIGHT.is_lit
             or self.dcPowWasOn != self.DC_POWER.is_lit
-            or self.heatingWasRequired != self.isHeatingRequired()
+            or self.heatingWasRequired != self.heatingIsRequired
             ):
             self.displayTemps(message + '  ')
             #if (not self.isHeatingRequired()):
@@ -278,7 +286,7 @@ class Control:
     def displayTemps(self, message = ''):
         self.io.displayTemps(
                 self.dontHeatReasons,
-                self.isHeatingRequired(),
+                self.heatingIsRequired,
                 self.FAN.is_lit,
                 self.LIGHT.is_lit,
                 self.DC_POWER.is_lit,

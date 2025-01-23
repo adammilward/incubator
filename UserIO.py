@@ -24,9 +24,9 @@ class UserIO:
         self.idiotCheckMedTemp = 26 #26
 
         self.heaterOnPercent = 4 #2
-        self.displayTempsTime = 600 #3600
+        self.displayTempsTime = 10 #3600
 
-        self.spawnHysteresis = -0.0
+        self.spawnHysteresis = -0.1
         self.spawnMaxOffset = 0.5
         self.fruitHysteresis = 0
         self.fruitMaxOffset = 0.5
