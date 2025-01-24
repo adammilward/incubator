@@ -190,7 +190,7 @@ class Control:
                 self.dontHeatReasons += ['fruitMax >= ' + str(val)]
 
         self.tempDiffs = sorted(self.tempDiffs, key=lambda item: item[1], reverse = True)
-        self.heatingIsRequired = len(self.dontHeatReasons) = 0
+        self.heatingIsRequired = len(self.dontHeatReasons) == 0
         return self.heatingIsRequired
             
 
@@ -306,7 +306,16 @@ class Control:
             print(str(e))
             traceback.print_exc()
             raise SensorRead.SensorReadException('Unhandled Exception cought reading sensors')
-            
+        
+        # self.model.storTemps(
+        #                     self.sensors.temps,
+        #                     self.sensors.fruitMedian,
+        #                     self.sensors.fruitMax,
+        #                     self.sensors.spawnMedian,
+        #                     self.sensors.spawnMax,
+        #                     self.sensors.heaterTemp
+        #                     )
+        
         self.detectPeaks()
     
     def detectPeaks(self):
@@ -355,9 +364,6 @@ class Control:
     def run(self):
         while True:
             try:
-                self.watchDog()
-                self.read()
-                self.action()
                 while True:
                     if ((int(str(int(time.time()))[-1]) >= 5)):
                         self.watchDog()
