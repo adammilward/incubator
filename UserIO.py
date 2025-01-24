@@ -1,5 +1,5 @@
 import time
-from espeak import espeak
+#from espeak import espeak
 from datetime import datetime
 import SensorRead
 import Camera
@@ -24,7 +24,7 @@ class UserIO:
         self.idiotCheckMedTemp = 26 #26
 
         self.heaterOnPercent = 4 #2
-        self.displayTempsTime = 10 #3600
+        self.displayTempsTime = 3600 #3600
 
         self.spawnHysteresis = -0.1
         self.spawnMaxOffset = 0.5
@@ -335,7 +335,7 @@ class UserIO:
 
     def output(self, string):
         print(string)
-        espeak.synth(string)
+        #espeak.synth(string)
 
     def userOptions(self):
         self.output("What do you want?")
@@ -366,6 +366,7 @@ class UserIO:
     def recordSettings(self):
         settings = {
             'heaterOnPercent': self.heaterOnPercent,
+            'displayTempsTime': self.displayTempsTime,
             'targetFruitTemp': self.targetFruitTemp,
             'targetSpawnTemp' :self.targetSpawnTemp,
             'maxTemp': self.maxTemp,
@@ -381,6 +382,7 @@ class UserIO:
                 file = open(self.SETTINGS_FILE)
                 settings = json.load(file)
                 self.heaterOnPercent = settings.get('heaterOnPercent', self.heaterOnPercent)
+                self.displayTempsTime = settings.get('displayTempsTime', self.displayTempsTime)
                 self.targetFruitTemp = settings.get('targetFruitTemp', self.targetFruitTemp)
                 self.targetSpawnTemp = settings.get('targetSpawnTemp', self.targetSpawnTemp)
                 self.maxTemp = settings.get('maxTemp', self.maxTemp)

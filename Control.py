@@ -391,7 +391,7 @@ class Control:
                 self.io.output("FAILURE! All things turned off.")
                 self.io.output(str(e))
                 traceback.print_exc()
-                self.io.soundAllarm()
+                #self.io.soundAllarm()
                 time.sleep(20)
                 raise e
             
