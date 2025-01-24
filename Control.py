@@ -357,7 +357,7 @@ class Control:
             raise Exception('Watchdog timed out')
         
     def writeIncubateTs(self, delay = 0):
-        incubate = open('/home/adam/python/incubate.ts', 'w')
+        incubate = open('/home/adam/python/incubate.ts', 'w+')
         incubate.write(str(int(time.time()) + delay))
         incubate.close()
 
