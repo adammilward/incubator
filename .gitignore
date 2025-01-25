@@ -1,5 +1,6 @@
 __pycache__
 
 config.py
-incubate.tx
+settings.json
+incubate.ts
 watchdog.ts
