@@ -260,6 +260,8 @@ class Control:
             self.displayTemps('too hot')
         else:
             self.HEATER.on()
+            if not self.HEATER.is_lit:
+                raise Exception("Heater should be on but isn't")
 
     def fanOff(self):
         self.FAN.off()
@@ -357,7 +359,7 @@ class Control:
             raise Exception('Watchdog timed out')
         
     def writeIncubateTs(self, delay = 0):
-        incubate = open('/home/adam/python/incubate.ts', 'w+')
+        incubate = open('/home/adam/python/incubate.ts', 'w')
         incubate.write(str(int(time.time()) + delay))
         incubate.close()
 
