@@ -1,0 +1,38 @@
+sudo apt update -y && sudo apt upgrade -y
+------------------
+sudo apt install git
+sudo apt-get install epiphany-browser
+sudo apt install screen
+sudo apt install realvnc-vnc-server realvnc-vnc-viewer
+
+--------------
+	crontab
+crontab -e 		(don't use sudo)
+@reboot /home/adam/python sh startScripts.sh
+---------
+
+--------------
+	Watchdog:
+
+watchdog setup in /etc/watchdog.conf
+
+sudo systemctl stop watchdog
+
+https://pimylifeup.com/raspberry-pi-watchdog/#:~:text=All%20of%20this%20is%20made,power%20cycle%20your%20Raspberry%20Pi.
+
+sudo apt install watchdog
+
+settings:
+interface = wlan0
+#max-load-1 = 24
+watchdog-timeout = 15
+watchdog-device = /dev/watchdog
+
+file = /home/adam/python/incubate.ts
+change = 120
+
+----------------------
+	python
+sudo pip3 install board
+sudo pip3 install adafruit-circuitpython-am2320
+sudo pip3 install gpiozero
