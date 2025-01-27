@@ -6,6 +6,7 @@ import traceback
 from gpiozero import LED
 from datetime import datetime
 import Camera
+import Model
 
 class Control:
     def __init__(self):
@@ -19,6 +20,8 @@ class Control:
         self.DC_POWER.off()
         self.FAN.off()
         self.LIGHT.off()
+
+        self.model = Model.Model()
 
         self.writeIncubateTs(10)
         self.lightOn()
@@ -81,6 +84,8 @@ class Control:
         self.lightAction()
         self.displayAction('a')
         
+        self.recordData(now)
+
         self.fanWasOn = self.FAN.is_lit
         self.lightWasOn = self.LIGHT.is_lit
         self.dcPowWasOn = self.DC_POWER.is_lit
@@ -250,6 +255,19 @@ class Control:
         if (int(time.time()) - self.lastDisplayTs >= self.io.displayTempsTime):
             self.displayTemps(message + '..')
 
+    def recordData(self, ts):
+        self.model.writeData(
+            ts,
+            self.sensors.temps,
+            self.sensors.fruitMedian,
+            self.sensors.fruitMax,
+            self.sensors.spawnMedian,
+            self.sensors.spawnMax,
+            self.sensors.heaterTemp,
+            self.sensors.humidity,
+            self.io.heaterOnPercent
+        )
+
     def heaterOff(self):
         self.HEATER.off()
     
@@ -308,15 +326,6 @@ class Control:
             print(str(e))
             traceback.print_exc()
             raise SensorRead.SensorReadException('Unhandled Exception cought reading sensors')
-        
-        # self.model.storTemps(
-        #                     self.sensors.temps,
-        #                     self.sensors.fruitMedian,
-        #                     self.sensors.fruitMax,
-        #                     self.sensors.spawnMedian,
-        #                     self.sensors.spawnMax,
-        #                     self.sensors.heaterTemp
-        #                     )
         
         self.detectPeaks()
     

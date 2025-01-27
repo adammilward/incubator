@@ -11,6 +11,9 @@ crontab -e 		(don't use sudo)
 @reboot /home/adam/python sh startScripts.sh
 ---------
 
+	shut down on pin 37 (gpio 26
+dtoverlay=gpio-shutdown,gpio_pin=26
+
 --------------
 	Watchdog:
 
@@ -36,3 +39,4 @@ change = 120
 sudo pip3 install board
 sudo pip3 install adafruit-circuitpython-am2320
 sudo pip3 install gpiozero
+pip install mysql-connector-python
