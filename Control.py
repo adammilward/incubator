@@ -10,7 +10,9 @@ import Model
 
 class Control:
     def __init__(self):
-        self.HEAING_REALISATION_PERIOD = 600
+        self.HEAING_REALISATION_PERIOD = 1200
+
+        nowTs = int(time.time())
 
         self.HEATER = LED(17)
         self.DC_POWER = LED(27)
@@ -26,7 +28,7 @@ class Control:
         self.writeIncubateTs(10)
         self.lightOn()
 
-        self.periodStartTs = 0
+        self.periodStartTs = nowTs
         self.fanHysteresis = 0
         self.fanHysteresis = 0
 
@@ -50,13 +52,12 @@ class Control:
         self.periodElapsedSeconds = 0
         self.previousPeriodElapsedSeconds = 0
         self.lastIncreaseSeconds = 0
-        self.heaterWasPropperActive = True
 
         self.heatingIsRequired = False
 
         self.io = UserIO.UserIO(self.sensors, self.camera)
 
-        self.lastDisplayTs = int(time.time()) - self.io.displayTempsTime
+        self.lastDisplayTs = int(nowTs) - self.io.displayTempsTime
 
     def __del__(self):
         print ("Control destroyed");
@@ -121,21 +122,34 @@ class Control:
         time.sleep(heaterOnSeconds)
         self.heaterOff()
         
-        self.heaterWasProppeActive = False
-
     def modifyHeaterOnPercent(self):
-        if (self.heatingWasRequired != self.heatingIsRequired
-            and self.heaterWasPropperActive):
+        if (self.heatingWasRequired != self.heatingIsRequired):
             self.reduceHeaterOnPercent()
         else:
             self.increaseHeaterOnPercent()
 
     def increaseHeaterOnPercent(self):
-        if (self.periodElapsedSeconds - self.lastIncreaseSeconds >= self.HEAING_REALISATION_PERIOD
-            and self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.3):
+        if (self.periodElapsedSeconds - self.lastIncreaseSeconds >= self.HEAING_REALISATION_PERIOD):
+
+            
+
+            if (self.sensors.spawnMedian < self.io.targetSpawnTemp - 0.3
+                and self.sensors.spawnMax < self.io.targetSpawnTemp + self.io.spawnMaxOffset - 0.3
+                and self.sensors.heaterTemp < self.io.heaterTemp - 0.3):
+            
+                if (self.periodElapsedSeconds >= 2400):
+                    self.io.heaterOnPercent *= 1.1
+            
+            else:
+
+                if (self.previousPeriodElapsedSeconds < 2400):
+                    self.io.heaterOnPercent *= 0.95
+            
+            
             self.lastIncreaseSeconds += self.HEAING_REALISATION_PERIOD
-            self.io.heaterOnPercent *= 1.2
+
             self.io.recordSettings()
+            self.displayTemps()
             #self.io.heaterOnPercent *= 1 + (0.0003 * self.io.heatingPeriod)
 
     def reduceHeaterOnPercent(self):
@@ -156,9 +170,6 @@ class Control:
 
 
     def heaterInactive(self):
-        if self.heatingWasRequired != self.heatingIsRequired:
-            if (self.previousPeriodElapsedSeconds >= 60):
-                self.heaterWasPropperActive = True
         self.heaterOff()
 
 

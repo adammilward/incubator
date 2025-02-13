@@ -17,10 +17,10 @@ class UserIO:
 
         # 25/26 for spawn, 21 air temp for fruiting, 23 (max 24) for substrate
 
-        self.targetFruitTemp = 25 #21
-        self.targetSpawnTemp = 25 #25
+        self.targetFruitTemp = 25.1 #21
+        self.targetSpawnTemp = 25.1 #25.1
         self.maxTemp = 26 #26
-        self.heaterTemp = 40 #39
+        self.heaterTemp = 40 #40
         self.idiotCheckMedTemp = 26 #26
 
         self.heaterOnPercent = 4 #2
